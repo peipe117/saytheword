@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Say the Word on Beat Game</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <style>
+        .perspective-1000 { perspective: 1000px; }
+        .preserve-3d { transform-style: preserve-3d; }
+        .backface-hidden { backface-visibility: hidden; }
+        .rotate-y-180 { transform: rotateY(180deg); }
+        .rotate-y-0 { transform: rotateY(0deg); }
+        
+        /* Custom scrollbar for settings */
+        textarea::-webkit-scrollbar {
+            width: 8px;
+        }
+        textarea::-webkit-scrollbar-track {
+            background: #f1f1f1; 
+        }
+        textarea::-webkit-scrollbar-thumb {
+            background: #888; 
+            border-radius: 4px;
+        }
+        textarea::-webkit-scrollbar-thumb:hover {
+            background: #555; 
+        }
+    </style>
+</head>
+<body class="bg-slate-100">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useCallback } = React;
+
+        // --- Icon Components (SVG) ---
+        const IconWrapper = ({ children, size = 24, className = "", ...props }) => (
+            <svg 
+                xmlns="http://www.w3.org/2000/svg" 
+                width={size} 
+                height={size} 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth="2" 
+                strokeLinecap="round" 
+                strokeLinejoin="round" 
+                className={className} 
+                {...props}
+            >
+                {children}
+            </svg>
+        );
+
+        const Play = (props) => <IconWrapper {...props}><polygon points="5 3 19 12 5 21 5 3"></polygon></IconWrapper>;
+        const RotateCcw = (props) => <IconWrapper {...props}><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74-2.74L3 12"></path><path d="M3 3v9h9"></path></IconWrapper>;
+        const Settings = (props) => <IconWrapper {...props}><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-1-1.72v-.51a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></IconWrapper>;
+        const X = (props) => <IconWrapper {...props}><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></IconWrapper>;
+        const Volume2 = (props) => <IconWrapper {...props}><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></IconWrapper>;
+        const VolumeX = (props) => <IconWrapper {...props}><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" x2="17" y1="9" y2="15"></line><line x1="17" x2="23" y1="9" y2="15"></line></IconWrapper>;
+        const Edit3 = (props) => <IconWrapper {...props}><path d="M12 20h9"></path><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path></IconWrapper>;
+        const Repeat = (props) => <IconWrapper {...props}><path d="m17 2 4 4-4 4"></path><path d="M3 11v-1a4 4 0 0 1 4-4h14"></path><path d="m7 22-4-4 4-4"></path><path d="M21 13v1a4 4 0 0 1-4 4H3"></path></IconWrapper>;
+        const BrainCircuit = (props) => <IconWrapper {...props}><path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"></path><path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"></path><path d="M15 13a4.5 4.5 0 0 1-3-4 4.5 4.5 0 0 1-3 4"></path><path d="M17.599 6.5a3 3 0 0 0 .399-1.375"></path><path d="M6.003 5.125A3 3 0 0 0 6.401 6.5"></path><path d="M3.477 10.896a4 4 0 0 1 .585-.396"></path><path d="M19.938 10.5a4 4 0 0 1 .585.396"></path><path d="M6 18a4 4 0 0 1-1.97-1.375"></path><path d="M19.97 16.625A4.002 4.002 0 0 1 18 18"></path></IconWrapper>;
+        const Sparkles = (props) => <IconWrapper {...props}><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275Z"></path></IconWrapper>;
+
+        // --- Main Game Component ---
+        const DEFAULT_VOCAB = [
+            "蘋果", "香蕉", "貓咪", "狗狗", 
+            "跑步", "跳舞", "開心", "生氣",
+            "🚗", "✈️", "🌞", "🌧️",
+            "學校", "老師", "紅色", "藍色",
+            "大", "小", "快", "慢"
+        ];
+
+        const BeatGame = () => {
+            // 狀態管理
+            const [vocabList, setVocabList] = useState(DEFAULT_VOCAB);
+            const [activeCards, setActiveCards] = useState([]);
+            const [currentBeat, setCurrentBeat] = useState(-1);
+            const [isPlaying, setIsPlaying] = useState(false);
+            
+            // 設定相關
+            const [showSettings, setShowSettings] = useState(false);
+            const [tempInput, setTempInput] = useState("");
+            const [bpm, setBpm] = useState(60);
+            const [soundEnabled, setSoundEnabled] = useState(true);
+            const [errorMsg, setErrorMsg] = useState("");
+            
+            // 循環與難度功能狀態
+            const [repeatCount, setRepeatCount] = useState(0); 
+            const [reshuffleOnLoop, setReshuffleOnLoop] = useState(true);
+            const [difficulty, setDifficulty] = useState('easy');
+            const [currentRoundDisplay, setCurrentRoundDisplay] = useState(1);
+
+            // Refs
+            const roundsPlayedRef = useRef(0);
+            const audioContextRef = useRef(null);
+
+            // 初始化/洗牌邏輯
+            const shuffleCards = useCallback(() => {
+                let selected = [];
+                const shuffledVocab = [...vocabList].sort(() => 0.5 - Math.random());
+
+                if (difficulty === 'easy') {
+                    // 簡單模式：選 4 個字，各重複 2 次
+                    let source = shuffledVocab;
+                    // 如果詞庫少於 4 個，嘗試補足
+                    if (source.length < 4 && source.length > 0) {
+                        while (source.length < 4) {
+                            source = source.concat(source);
+                        }
+                    }
+                    if (source.length >= 4) {
+                         const picked4 = source.slice(0, 4);
+                         const pairs = [...picked4, ...picked4];
+                         selected = pairs.sort(() => 0.5 - Math.random());
+                    } else {
+                         // Fallback for very empty lists (shouldn't happen with defaults)
+                         selected = Array(8).fill("?");
+                    }
+
+                } else {
+                    // 進階模式：選 8 個不同字
+                    selected = shuffledVocab.slice(0, 8);
+                    while (selected.length < 8 && selected.length > 0) {
+                        selected = selected.concat(shuffledVocab).slice(0, 8);
+                    }
+                }
+                setActiveCards(selected);
+            }, [vocabList, difficulty]);
+
+            // 初始掛載
+            useEffect(() => {
+                shuffleCards();
+            }, [shuffleCards]);
+
+            // 音效處理
+            const playTickSound = useCallback((frequency = 800, type = 'sine', duration = 0.1) => {
+                if (!soundEnabled) return;
+                
+                try {
+                    if (!audioContextRef.current) {
+                        const AudioContext = window.AudioContext || window.webkitAudioContext;
+                        if (AudioContext) {
+                            audioContextRef.current = new AudioContext();
+                        }
+                    }
+                    const ctx = audioContextRef.current;
+                    if (ctx && ctx.state === 'suspended') ctx.resume();
+
+                    if (ctx) {
+                        const osc = ctx.createOscillator();
+                        const gainNode = ctx.createGain();
+
+                        osc.type = type;
+                        osc.frequency.setValueAtTime(frequency, ctx.currentTime);
+                        
+                        gainNode.gain.setValueAtTime(0.1, ctx.currentTime);
+                        gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+
+                        osc.connect(gainNode);
+                        gainNode.connect(ctx.destination);
+
+                        osc.start();
+                        osc.stop(ctx.currentTime + duration);
+                    }
+                } catch (e) {
+                    console.error("Audio play error", e);
+                }
+            }, [soundEnabled]);
+
+            // 遊戲核心迴圈
+            useEffect(() => {
+                let interval;
+
+                if (isPlaying) {
+                    const beatInterval = 60000 / bpm;
+                    
+                    interval = setInterval(() => {
+                        setCurrentBeat((prevBeat) => {
+                            const nextBeat = prevBeat + 1;
+
+                            // 情況 A: 還在 8 張卡片內
+                            if (nextBeat < 8) {
+                                playTickSound(1000, 'triangle'); 
+                                return nextBeat;
+                            } 
+                            
+                            // 情況 B: 一輪結束
+                            if (roundsPlayedRef.current < repeatCount) {
+                                roundsPlayedRef.current += 1;
+                                setCurrentRoundDisplay(roundsPlayedRef.current + 1); 
+                                playTickSound(600, 'square', 0.15);
+
+                                if (reshuffleOnLoop) {
+                                    shuffleCards();
+                                }
+
+                                return -1; 
+                            } else {
+                                // 情況 C: 全部結束
+                                playTickSound(400, 'sine', 0.3);
+                                setIsPlaying(false);
+                                return nextBeat; 
+                            }
+                        });
+                    }, beatInterval);
+                }
+
+                return () => clearInterval(interval);
+            }, [isPlaying, bpm, repeatCount, reshuffleOnLoop, shuffleCards, playTickSound]);
+
+            const handleStart = () => {
+                if (currentBeat >= 7 || currentBeat === -1) {
+                    roundsPlayedRef.current = 0; 
+                    setCurrentRoundDisplay(1);
+                    shuffleCards();
+                    setTimeout(() => {
+                        setCurrentBeat(-1);
+                        setIsPlaying(true);
+                    }, 100);
+                } else {
+                    setIsPlaying(true);
+                }
+            };
+
+            const handleReset = () => {
+                setIsPlaying(false);
+                setCurrentBeat(-1);
+                roundsPlayedRef.current = 0;
+                setCurrentRoundDisplay(1); 
+                shuffleCards();
+            };
+
+            const saveCustomList = () => {
+                const list = tempInput.split(/[\n,、]+/).map(s => s.trim()).filter(s => s.length > 0);
+                if (list.length >= 4) {
+                    setVocabList(list);
+                    setShowSettings(false);
+                    setErrorMsg("");
+                    handleReset();
+                } else {
+                    setErrorMsg("請至少輸入 4 個生字或圖案！");
+                }
+            };
+
+            const openSettings = () => {
+                setTempInput(vocabList.join("、"));
+                setErrorMsg("");
+                setShowSettings(true);
+            };
+
+            return (
+                <div className="min-h-screen bg-slate-100 flex flex-col items-center justify-center p-4 font-sans text-slate-800">
+                    
+                    {/* 標題與控制列 */}
+                    <div className="w-full max-w-4xl mb-6 flex flex-col md:flex-row items-center justify-between gap-4 bg-white p-4 rounded-xl shadow-sm">
+                        <div>
+                            <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                                <span className="text-indigo-600">🎶</span> Say the Word on Beat
+                            </h1>
+                            <div className="flex items-center gap-2 text-sm text-slate-500 mt-1 flex-wrap">
+                                <span className={`px-2 py-0.5 rounded-full text-xs flex items-center gap-1 ${difficulty === 'easy' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
+                                    {difficulty === 'easy' ? <Sparkles size={10} /> : <BrainCircuit size={10} />}
+                                    {difficulty === 'easy' ? '簡單模式' : '進階模式'}
+                                </span>
+                                
+                                {repeatCount > 0 ? (
+                                    <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
+                                        <Repeat size={10} />
+                                        第 {currentRoundDisplay} / {repeatCount + 1} 輪
+                                    </span>
+                                ) : (
+                                    <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">
+                                        單次練習
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-3 flex-wrap justify-end">
+                            {/* BPM Control */}
+                            <div className="flex items-center gap-2 bg-slate-100 px-3 py-1.5 rounded-lg">
+                                <span className="text-xs font-bold text-slate-500">BPM</span>
+                                <input 
+                                    type="range" 
+                                    min="40" 
+                                    max="160" 
+                                    step="5"
+                                    value={bpm} 
+                                    onChange={(e) => setBpm(parseInt(e.target.value))}
+                                    className="w-20 accent-indigo-600"
+                                />
+                                <span className="text-sm font-mono w-8 text-center">{bpm}</span>
+                            </div>
+
+                            <button 
+                                onClick={() => setSoundEnabled(!soundEnabled)}
+                                className={`p-2 rounded-full ${soundEnabled ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-200 text-slate-400'}`}
+                            >
+                                {soundEnabled ? <Volume2 size={20} /> : <VolumeX size={20} />}
+                            </button>
+
+                            <button 
+                                onClick={openSettings}
+                                className="flex items-center gap-1 px-4 py-2 bg-slate-200 hover:bg-slate-300 rounded-lg font-medium transition-colors"
+                            >
+                                <Settings size={18} /> 設定
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* 主要遊戲區 */}
+                    <div className="w-full max-w-4xl relative">
+                        
+                        {/* 卡片網格 */}
+                        <div className="grid grid-cols-4 gap-4 w-full aspect-[2/1] md:aspect-[8/3]">
+                            {activeCards.map((word, index) => {
+                                const isRevealed = index <= currentBeat;
+                                const isJustRevealed = index === currentBeat;
+                                
+                                return (
+                                    <div key={index} className="relative w-full h-full perspective-1000">
+                                        <div 
+                                            className={`relative w-full h-full duration-500 preserve-3d transition-transform ${isRevealed ? 'rotate-y-0' : 'rotate-y-180'}`}
+                                            style={{ transformStyle: 'preserve-3d', transform: isRevealed ? 'rotateY(0deg)' : 'rotateY(180deg)' }}
+                                        >
+                                            {/* 正面 */}
+                                            <div className={`absolute w-full h-full backface-hidden rounded-xl shadow-lg flex items-center justify-center text-3xl md:text-4xl font-bold select-none border-4
+                                                ${isJustRevealed 
+                                                    ? 'bg-indigo-50 border-indigo-400 text-indigo-700 scale-105 z-10 ring-4 ring-indigo-200' 
+                                                    : 'bg-white border-slate-200 text-slate-700 scale-100'}
+                                                transition-all duration-300
+                                            `}>
+                                                {word}
+                                            </div>
+
+                                            {/* 背面 */}
+                                            <div 
+                                                className="absolute w-full h-full backface-hidden rounded-xl shadow-md bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center border-4 border-white"
+                                                style={{ transform: 'rotateY(180deg)' }}
+                                            >
+                                                <span className="text-white/30 text-4xl font-bold">{index + 1}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        {/* 底部播放控制 */}
+                        <div className="mt-8 flex justify-center gap-6">
+                            {!isPlaying && currentBeat === -1 && (
+                                <button 
+                                    onClick={handleStart}
+                                    className="group flex flex-col items-center gap-2"
+                                >
+                                    <div className="w-16 h-16 bg-indigo-600 rounded-full flex items-center justify-center shadow-lg shadow-indigo-300 group-hover:scale-110 transition-transform">
+                                        <Play fill="white" className="ml-1 text-white" size={32} />
+                                    </div>
+                                    <span className="font-bold text-indigo-600">開始</span>
+                                </button>
+                            )}
+
+                            {isPlaying && (
+                                <button 
+                                    onClick={() => setIsPlaying(false)}
+                                    className="group flex flex-col items-center gap-2"
+                                >
+                                    <div className="w-16 h-16 bg-red-500 rounded-full flex items-center justify-center shadow-lg shadow-red-300 group-hover:scale-110 transition-transform">
+                                        <div className="w-8 h-8 bg-white rounded-md"></div>
+                                    </div>
+                                    <span className="font-bold text-red-500">暫停</span>
+                                </button>
+                            )}
+
+                            {(!isPlaying && currentBeat !== -1) && (
+                                <div className="flex gap-6">
+                                    <button 
+                                        onClick={handleStart}
+                                        className="group flex flex-col items-center gap-2"
+                                    >
+                                        <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center shadow-lg shadow-green-300 group-hover:scale-110 transition-transform">
+                                            <Play fill="white" className="ml-1 text-white" size={32} />
+                                        </div>
+                                        <span className="font-bold text-green-600">繼續</span>
+                                    </button>
+
+                                    <button 
+                                        onClick={handleReset}
+                                        className="group flex flex-col items-center gap-2"
+                                    >
+                                        <div className="w-16 h-16 bg-slate-200 rounded-full flex items-center justify-center group-hover:bg-slate-300 transition-colors">
+                                            <RotateCcw className="text-slate-600" size={32} />
+                                        </div>
+                                        <span className="font-bold text-slate-500">重置</span>
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="mt-8 text-slate-400 text-sm font-medium">
+                        Sophia Wong 修訂
+                    </div>
+
+                    {/* 設定 Modal */}
+                    {showSettings && (
+                        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
+                                <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-indigo-50">
+                                    <h2 className="text-lg font-bold text-indigo-900 flex items-center gap-2">
+                                        <Settings size={20} /> 遊戲設定
+                                    </h2>
+                                    <button onClick={() => setShowSettings(false)} className="text-slate-400 hover:text-slate-600">
+                                        <X size={24} />
+                                    </button>
+                                </div>
+                                
+                                <div className="p-6 overflow-y-auto">
+                                    
+                                    {/* 1. 難度設定 */}
+                                    <div className="mb-6 p-4 bg-slate-50 rounded-xl border border-slate-100">
+                                        <h3 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
+                                            <BrainCircuit size={16} /> 難度模式
+                                        </h3>
+                                        <div className="flex flex-col gap-3">
+                                            {/* 簡單模式選項 */}
+                                            <label className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all ${difficulty === 'easy' ? 'bg-white border-green-400 shadow-sm ring-1 ring-green-100' : 'border-transparent hover:bg-white'}`}>
+                                                <input 
+                                                    type="radio" 
+                                                    name="difficulty"
+                                                    value="easy"
+                                                    checked={difficulty === 'easy'}
+                                                    onChange={() => setDifficulty('easy')}
+                                                    className="mt-1 w-4 h-4 text-green-600 border-gray-300 focus:ring-green-500"
+                                                />
+                                                <div>
+                                                    <span className="block font-bold text-slate-800 text-sm">簡單模式 (Easy)</span>
+                                                    <span className="text-xs text-slate-500">
+                                                        每次選出 <strong className="text-green-600">4 個生字</strong>，每個字出現 <strong className="text-green-600">2 次</strong>。
+                                                        <br/>適合初學者熟悉單字。
+                                                    </span>
+                                                </div>
+                                            </label>
+
+                                            {/* 進階模式選項 */}
+                                            <label className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all ${difficulty === 'advanced' ? 'bg-white border-orange-400 shadow-sm ring-1 ring-orange-100' : 'border-transparent hover:bg-white'}`}>
+                                                <input 
+                                                    type="radio" 
+                                                    name="difficulty"
+                                                    value="advanced"
+                                                    checked={difficulty === 'advanced'}
+                                                    onChange={() => setDifficulty('advanced')}
+                                                    className="mt-1 w-4 h-4 text-orange-600 border-gray-300 focus:ring-orange-500"
+                                                />
+                                                <div>
+                                                    <span className="block font-bold text-slate-800 text-sm">進階模式 (Advanced)</span>
+                                                    <span className="text-xs text-slate-500">
+                                                        每次選出 <strong className="text-orange-600">8 個不重複</strong>的生字。
+                                                        <br/>適合挑戰反應速度與大量單字。
+                                                    </span>
+                                                </div>
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    {/* 2. 循環設定 */}
+                                    <div className="mb-6 p-4 bg-slate-50 rounded-xl border border-slate-100">
+                                        <h3 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
+                                            <Repeat size={16} /> 自動循環設定
+                                        </h3>
+                                        <div className="space-y-4">
+                                            <div className="flex items-center justify-between">
+                                                <label className="text-sm text-slate-600">額外重複次數</label>
+                                                <div className="flex items-center gap-2">
+                                                    <input 
+                                                        type="number" 
+                                                        min="0" 
+                                                        max="20"
+                                                        value={repeatCount}
+                                                        onChange={(e) => setRepeatCount(Math.max(0, parseInt(e.target.value) || 0))}
+                                                        className="w-20 p-1 border border-slate-300 rounded text-center"
+                                                    />
+                                                    <span className="text-xs text-slate-400">次 (0 = 玩一次即停)</span>
+                                                </div>
+                                            </div>
+
+                                            <div className="flex items-center gap-2">
+                                                <input 
+                                                    type="checkbox"
+                                                    id="reshuffle"
+                                                    checked={reshuffleOnLoop}
+                                                    onChange={(e) => setReshuffleOnLoop(e.target.checked)}
+                                                    className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500"
+                                                />
+                                                <label htmlFor="reshuffle" className="text-sm text-slate-600 cursor-pointer select-none">
+                                                    循環時更換新的生字 (重新洗牌)
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* 3. 生字設定 */}
+                                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                                        <Edit3 size={16} className="inline mr-1" /> 自定義生字庫
+                                    </label>
+                                    <textarea 
+                                        value={tempInput}
+                                        onChange={(e) => setTempInput(e.target.value)}
+                                        className="w-full h-32 p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-none text-base"
+                                        placeholder="例如：蘋果, 香蕉, 🚗, ✈️ (用逗號分隔)"
+                                    ></textarea>
+                                    <p className="text-xs text-slate-500 mt-2">
+                                        * 詞庫越多，啟用「循環時更換生字」就越好玩！
+                                    </p>
+                                    {errorMsg && (
+                                        <p className="text-sm text-red-500 mt-2 font-bold">{errorMsg}</p>
+                                    )}
+                                </div>
+
+                                <div className="p-4 border-t border-slate-100 flex justify-end gap-3 bg-slate-50">
+                                    <button 
+                                        onClick={() => setShowSettings(false)}
+                                        className="px-4 py-2 text-slate-600 hover:bg-slate-200 rounded-lg font-medium transition-colors"
+                                    >
+                                        取消
+                                    </button>
+                                    <button 
+                                        onClick={saveCustomList}
+                                        className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold shadow-md transition-transform active:scale-95"
+                                    >
+                                        儲存設定
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<BeatGame />);
+    </script>
+</body>
+</html>

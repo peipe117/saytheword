@@ -70,19 +70,30 @@
         const Repeat = (props) => <IconWrapper {...props}><path d="m17 2 4 4-4 4"></path><path d="M3 11v-1a4 4 0 0 1 4-4h14"></path><path d="m7 22-4-4 4-4"></path><path d="M21 13v1a4 4 0 0 1-4 4H3"></path></IconWrapper>;
         const BrainCircuit = (props) => <IconWrapper {...props}><path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"></path><path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"></path><path d="M15 13a4.5 4.5 0 0 1-3-4 4.5 4.5 0 0 1-3 4"></path><path d="M17.599 6.5a3 3 0 0 0 .399-1.375"></path><path d="M6.003 5.125A3 3 0 0 0 6.401 6.5"></path><path d="M3.477 10.896a4 4 0 0 1 .585-.396"></path><path d="M19.938 10.5a4 4 0 0 1 .585.396"></path><path d="M6 18a4 4 0 0 1-1.97-1.375"></path><path d="M19.97 16.625A4.002 4.002 0 0 1 18 18"></path></IconWrapper>;
         const Sparkles = (props) => <IconWrapper {...props}><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275Z"></path></IconWrapper>;
+        const BookOpen = (props) => <IconWrapper {...props}><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></IconWrapper>;
+        const Trash2 = (props) => <IconWrapper {...props}><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path><line x1="10" x2="10" y1="11" y2="17"></line><line x1="14" x2="14" y1="11" y2="17"></line></IconWrapper>;
 
         // --- Main Game Component ---
-        const DEFAULT_VOCAB = [
-            "蘋果", "香蕉", "貓咪", "狗狗", 
-            "跑步", "跳舞", "開心", "生氣",
-            "🚗", "✈️", "🌞", "🌧️",
-            "學校", "老師", "紅色", "藍色",
-            "大", "小", "快", "慢"
+        const LESSONS = [
+            { id: 1, name: "第一課：新同學", words: "新同學自己年跟比" },
+            { id: 2, name: "第二課：我爸爸做生意", words: "外公以前工作班後" },
+            { id: 3, name: "第三課：去超級市場", words: "去近買東西魚還可" },
+            { id: 4, name: "第四課：我想吃漢堡", words: "出先週末晚蛋飯現點" },
+            { id: 5, name: "第五課：秋天快到了", words: "黃綠色時候花子紅白" },
+            { id: 6, name: "第六課：農曆新年", words: "說對星期會每給如果" },
+            { id: 7, name: "第七課：早一點睡覺", words: "起累早洗昨過別忘用臉" },
+            { id: 8, name: "第八課：我的寵物", words: "送隻狗帶散步貓非愛" },
+            { id: 9, name: "第九課：音樂教室在北方", words: "南北方裡校門口因為所" },
+            { id: 10, name: "第十課：外婆住在臺灣", words: "本著退休次旅行法國" },
+            { id: 11, name: "第十一課：去動物園", words: "動物園老希望但胖真長" },
+            { id: 12, name: "第十二課：打網路電話", words: "久話高課寫沒題定意思" }
         ];
 
+        const STORAGE_KEY = 'beatGame_custom_list';
+
         const BeatGame = () => {
-            // 狀態管理
-            const [vocabList, setVocabList] = useState(DEFAULT_VOCAB);
+            // 狀態管理 - 預設載入第一課
+            const [vocabList, setVocabList] = useState(LESSONS[0].words.split(''));
             const [activeCards, setActiveCards] = useState([]);
             const [currentBeat, setCurrentBeat] = useState(-1);
             const [isPlaying, setIsPlaying] = useState(false);
@@ -94,6 +105,9 @@
             const [soundEnabled, setSoundEnabled] = useState(true);
             const [errorMsg, setErrorMsg] = useState("");
             
+            // 課程選擇 - 預設 ID 為 1
+            const [selectedLesson, setSelectedLesson] = useState(1);
+
             // 循環與難度功能狀態
             const [repeatCount, setRepeatCount] = useState(0); 
             const [reshuffleOnLoop, setReshuffleOnLoop] = useState(true);
@@ -141,6 +155,44 @@
             useEffect(() => {
                 shuffleCards();
             }, [shuffleCards]);
+
+            // 處理課程選擇
+            const handleLessonChange = (e) => {
+                const val = e.target.value;
+                
+                // 停止遊戲並重置狀態
+                setIsPlaying(false);
+                setCurrentBeat(-1);
+                roundsPlayedRef.current = 0;
+                setCurrentRoundDisplay(1);
+
+                if (val === "custom") {
+                    setSelectedLesson("custom");
+                    // 嘗試從 localStorage 讀取
+                    const savedList = localStorage.getItem(STORAGE_KEY);
+                    if (savedList) {
+                        try {
+                            const parsedList = JSON.parse(savedList);
+                            setVocabList(parsedList);
+                        } catch (e) {
+                            console.error("讀取紀錄失敗", e);
+                            setVocabList([]); // 讀取失敗則清空
+                            openSettings(); // 並打開設定讓使用者輸入
+                        }
+                    } else {
+                        // 如果沒有紀錄，打開設定
+                        setVocabList([]);
+                        openSettings();
+                    }
+                } else {
+                    const lessonId = parseInt(val);
+                    setSelectedLesson(lessonId);
+                    const lesson = LESSONS.find(l => l.id === lessonId);
+                    if (lesson) {
+                        setVocabList(lesson.words.split(''));
+                    }
+                }
+            };
 
             // 音效處理
             const playTickSound = useCallback((frequency = 800, type = 'sine', duration = 0.1) => {
@@ -244,6 +296,11 @@
                 const list = tempInput.split(/[\n,、]+/).map(s => s.trim()).filter(s => s.length > 0);
                 if (list.length >= 4) {
                     setVocabList(list);
+                    setSelectedLesson("custom"); // 標記為自定義
+                    
+                    // 儲存到 localStorage
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+
                     setShowSettings(false);
                     setErrorMsg("");
                     handleReset();
@@ -252,8 +309,37 @@
                 }
             };
 
+            const clearCustomList = () => {
+                if (window.confirm("確定要刪除已儲存的自定義生字嗎？此動作無法復原。")) {
+                    localStorage.removeItem(STORAGE_KEY);
+                    setTempInput("");
+                    
+                    // 如果目前正在使用自定義生字，則切換回第一課以避免錯誤
+                    if (selectedLesson === "custom") {
+                        setSelectedLesson(1);
+                        setVocabList(LESSONS[0].words.split(''));
+                        handleReset();
+                    }
+                    setErrorMsg("已清除自定義紀錄");
+                }
+            };
+
             const openSettings = () => {
-                setTempInput(vocabList.join("、"));
+                // 如果是自定義模式，且有內容，預設填入目前的 vocabList
+                // 如果是課程模式，預設空白，讓使用者自己輸入
+                if (selectedLesson === "custom" && vocabList.length > 0) {
+                     setTempInput(vocabList.join("、"));
+                } else {
+                     setTempInput(""); 
+                     // 也可以選擇讀取 localStorage 作為預設值
+                     const saved = localStorage.getItem(STORAGE_KEY);
+                     if (saved) {
+                         try {
+                             setTempInput(JSON.parse(saved).join("、"));
+                         } catch (e) {}
+                     }
+                }
+                
                 setErrorMsg("");
                 setShowSettings(true);
             };
@@ -262,60 +348,85 @@
                 <div className="min-h-screen bg-slate-100 flex flex-col items-center justify-center p-4 font-sans text-slate-800">
                     
                     {/* 標題與控制列 */}
-                    <div className="w-full max-w-4xl mb-6 flex flex-col md:flex-row items-center justify-between gap-4 bg-white p-4 rounded-xl shadow-sm">
-                        <div>
-                            <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-                                <span className="text-indigo-600">🎶</span> Say the Word on Beat
-                            </h1>
-                            <div className="flex items-center gap-2 text-sm text-slate-500 mt-1 flex-wrap">
-                                <span className={`px-2 py-0.5 rounded-full text-xs flex items-center gap-1 ${difficulty === 'easy' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
-                                    {difficulty === 'easy' ? <Sparkles size={10} /> : <BrainCircuit size={10} />}
-                                    {difficulty === 'easy' ? '簡單模式' : '進階模式'}
-                                </span>
-                                
-                                {repeatCount > 0 ? (
-                                    <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
-                                        <Repeat size={10} />
-                                        第 {currentRoundDisplay} / {repeatCount + 1} 輪
+                    <div className="w-full max-w-4xl mb-6 flex flex-col items-start gap-4 bg-white p-4 rounded-xl shadow-sm">
+                        
+                        {/* 標題區塊 */}
+                        <div className="w-full flex flex-col md:flex-row md:items-center justify-between gap-4">
+                            <div>
+                                <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                                    <span className="text-indigo-600">🎶</span> Say the Word on Beat
+                                </h1>
+                                <p className="text-indigo-500 text-sm font-bold ml-9 mb-2">學華語向前走第二冊</p>
+                                <div className="flex items-center gap-2 text-sm text-slate-500 mt-1 flex-wrap">
+                                    <span className={`px-2 py-0.5 rounded-full text-xs flex items-center gap-1 ${difficulty === 'easy' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
+                                        {difficulty === 'easy' ? <Sparkles size={10} /> : <BrainCircuit size={10} />}
+                                        {difficulty === 'easy' ? '簡單模式' : '進階模式'}
                                     </span>
-                                ) : (
-                                    <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">
-                                        單次練習
-                                    </span>
-                                )}
+                                    
+                                    {repeatCount > 0 ? (
+                                        <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
+                                            <Repeat size={10} />
+                                            第 {currentRoundDisplay} / {repeatCount + 1} 輪
+                                        </span>
+                                    ) : (
+                                        <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">
+                                            單次練習
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* 控制按鈕區 */}
+                            <div className="flex items-center gap-3 flex-wrap justify-end">
+                                {/* BPM Control */}
+                                <div className="flex items-center gap-2 bg-slate-100 px-3 py-1.5 rounded-lg">
+                                    <span className="text-xs font-bold text-slate-500">BPM</span>
+                                    <input 
+                                        type="range" 
+                                        min="40" 
+                                        max="160" 
+                                        step="5"
+                                        value={bpm} 
+                                        onChange={(e) => setBpm(parseInt(e.target.value))}
+                                        className="w-20 accent-indigo-600"
+                                    />
+                                    <span className="text-sm font-mono w-8 text-center">{bpm}</span>
+                                </div>
+
+                                <button 
+                                    onClick={() => setSoundEnabled(!soundEnabled)}
+                                    className={`p-2 rounded-full ${soundEnabled ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-200 text-slate-400'}`}
+                                >
+                                    {soundEnabled ? <Volume2 size={20} /> : <VolumeX size={20} />}
+                                </button>
+
+                                <button 
+                                    onClick={openSettings}
+                                    className="flex items-center gap-1 px-4 py-2 bg-slate-200 hover:bg-slate-300 rounded-lg font-medium transition-colors"
+                                >
+                                    <Settings size={18} /> 設定
+                                </button>
                             </div>
                         </div>
 
-                        <div className="flex items-center gap-3 flex-wrap justify-end">
-                            {/* BPM Control */}
-                            <div className="flex items-center gap-2 bg-slate-100 px-3 py-1.5 rounded-lg">
-                                <span className="text-xs font-bold text-slate-500">BPM</span>
-                                <input 
-                                    type="range" 
-                                    min="40" 
-                                    max="160" 
-                                    step="5"
-                                    value={bpm} 
-                                    onChange={(e) => setBpm(parseInt(e.target.value))}
-                                    className="w-20 accent-indigo-600"
-                                />
-                                <span className="text-sm font-mono w-8 text-center">{bpm}</span>
-                            </div>
-
-                            <button 
-                                onClick={() => setSoundEnabled(!soundEnabled)}
-                                className={`p-2 rounded-full ${soundEnabled ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-200 text-slate-400'}`}
-                            >
-                                {soundEnabled ? <Volume2 size={20} /> : <VolumeX size={20} />}
-                            </button>
-
-                            <button 
-                                onClick={openSettings}
-                                className="flex items-center gap-1 px-4 py-2 bg-slate-200 hover:bg-slate-300 rounded-lg font-medium transition-colors"
-                            >
-                                <Settings size={18} /> 設定
-                            </button>
+                        {/* 課程選擇區 */}
+                        <div className="w-full pt-2 border-t border-slate-100 flex items-center gap-2">
+                             <BookOpen size={20} className="text-indigo-500" />
+                             <select 
+                                value={selectedLesson}
+                                onChange={handleLessonChange}
+                                className="flex-1 p-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-700 text-sm font-medium focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none cursor-pointer"
+                             >
+                                {LESSONS.map(lesson => (
+                                    <option key={lesson.id} value={lesson.id}>
+                                        {lesson.name}
+                                    </option>
+                                ))}
+                                <option disabled>──────────</option>
+                                <option value="custom">✏️ 自定義生字 (我的最愛)</option>
+                             </select>
                         </div>
+
                     </div>
 
                     {/* 主要遊戲區 */}
@@ -527,19 +638,27 @@
                                     )}
                                 </div>
 
-                                <div className="p-4 border-t border-slate-100 flex justify-end gap-3 bg-slate-50">
+                                <div className="p-4 border-t border-slate-100 flex justify-between items-center bg-slate-50">
                                     <button 
-                                        onClick={() => setShowSettings(false)}
-                                        className="px-4 py-2 text-slate-600 hover:bg-slate-200 rounded-lg font-medium transition-colors"
+                                        onClick={clearCustomList}
+                                        className="text-red-500 hover:text-red-700 text-sm font-medium flex items-center gap-1 px-2 py-1 rounded hover:bg-red-50 transition-colors"
                                     >
-                                        取消
+                                        <Trash2 size={16} /> 清除紀錄
                                     </button>
-                                    <button 
-                                        onClick={saveCustomList}
-                                        className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold shadow-md transition-transform active:scale-95"
-                                    >
-                                        儲存設定
-                                    </button>
+                                    <div className="flex gap-3">
+                                        <button 
+                                            onClick={() => setShowSettings(false)}
+                                            className="px-4 py-2 text-slate-600 hover:bg-slate-200 rounded-lg font-medium transition-colors"
+                                        >
+                                            取消
+                                        </button>
+                                        <button 
+                                            onClick={saveCustomList}
+                                            className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold shadow-md transition-transform active:scale-95"
+                                        >
+                                            儲存設定
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>

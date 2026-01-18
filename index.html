@@ -61,7 +61,7 @@
         );
 
         const Play = (props) => <IconWrapper {...props}><polygon points="5 3 19 12 5 21 5 3"></polygon></IconWrapper>;
-        const RotateCcw = (props) => <IconWrapper {...props}><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74-2.74L3 12"></path><path d="M3 3v9h9"></path></IconWrapper>;
+        const RefreshCw = (props) => <IconWrapper {...props}><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 12"></path><path d="M21 3v9h-9"></path></IconWrapper>;
         const Settings = (props) => <IconWrapper {...props}><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-1-1.72v-.51a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></IconWrapper>;
         const X = (props) => <IconWrapper {...props}><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></IconWrapper>;
         const Volume2 = (props) => <IconWrapper {...props}><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></IconWrapper>;
@@ -92,11 +92,16 @@
         const STORAGE_KEY = 'beatGame_custom_list';
 
         const BeatGame = () => {
-            // 狀態管理 - 預設載入第一課
+            // 狀態管理
             const [vocabList, setVocabList] = useState(LESSONS[0].words.split(''));
             const [activeCards, setActiveCards] = useState([]);
+            
+            // Game Status
+            const [gameStatus, setGameStatus] = useState('idle');
             const [currentBeat, setCurrentBeat] = useState(-1);
-            const [isPlaying, setIsPlaying] = useState(false);
+            
+            // For Intro Animation
+            const [introRevealedCount, setIntroRevealedCount] = useState(0); 
             
             // 設定相關
             const [showSettings, setShowSettings] = useState(false);
@@ -105,7 +110,7 @@
             const [soundEnabled, setSoundEnabled] = useState(true);
             const [errorMsg, setErrorMsg] = useState("");
             
-            // 課程選擇 - 預設 ID 為 1
+            // 課程選擇
             const [selectedLesson, setSelectedLesson] = useState(1);
 
             // 循環與難度功能狀態
@@ -126,7 +131,6 @@
                 if (difficulty === 'easy') {
                     // 簡單模式：選 4 個字，各重複 2 次
                     let source = shuffledVocab;
-                    // 如果詞庫少於 4 個，嘗試補足
                     if (source.length < 4 && source.length > 0) {
                         while (source.length < 4) {
                             source = source.concat(source);
@@ -137,7 +141,6 @@
                          const pairs = [...picked4, ...picked4];
                          selected = pairs.sort(() => 0.5 - Math.random());
                     } else {
-                         // Fallback for very empty lists (shouldn't happen with defaults)
                          selected = Array(8).fill("?");
                     }
 
@@ -160,30 +163,33 @@
             const handleLessonChange = (e) => {
                 const val = e.target.value;
                 
-                // 停止遊戲並重置狀態
-                setIsPlaying(false);
+                // 重置遊戲
+                setGameStatus('idle');
                 setCurrentBeat(-1);
                 roundsPlayedRef.current = 0;
                 setCurrentRoundDisplay(1);
+                setIntroRevealedCount(0);
 
                 if (val === "custom") {
                     setSelectedLesson("custom");
-                    // 嘗試從 localStorage 讀取
                     const savedList = localStorage.getItem(STORAGE_KEY);
                     if (savedList) {
                         try {
                             const parsedList = JSON.parse(savedList);
                             setVocabList(parsedList);
                         } catch (e) {
-                            console.error("讀取紀錄失敗", e);
-                            setVocabList([]); // 讀取失敗則清空
-                            openSettings(); // 並打開設定讓使用者輸入
+                            setVocabList([]);
+                            openSettings();
                         }
                     } else {
-                        // 如果沒有紀錄，打開設定
                         setVocabList([]);
                         openSettings();
                     }
+                } else if (val === "review") {
+                    setSelectedLesson("review");
+                    // 將所有課程的生字合併成一個大陣列
+                    const allWords = LESSONS.flatMap(lesson => lesson.words.split(''));
+                    setVocabList(allWords);
                 } else {
                     const lessonId = parseInt(val);
                     setSelectedLesson(lessonId);
@@ -194,7 +200,7 @@
                 }
             };
 
-            // 音效處理
+            // 音效處理 - 使用 Oscillator (嗶嗶聲)
             const playTickSound = useCallback((frequency = 800, type = 'sine', duration = 0.1) => {
                 if (!soundEnabled) return;
                 
@@ -229,66 +235,112 @@
                 }
             }, [soundEnabled]);
 
-            // 遊戲核心迴圈
+            // Intro Animation Loop
+            useEffect(() => {
+                let interval;
+                if (gameStatus === 'intro') {
+                    interval = setInterval(() => {
+                        setIntroRevealedCount(prev => {
+                            if (prev >= 8) {
+                                // Animation finished, start playing
+                                clearInterval(interval);
+                                setGameStatus('playing');
+                                setCurrentBeat(-1);
+                                return 8; 
+                            }
+                            // Play a soft tick for reveal effect
+                            playTickSound(600, 'sine', 0.05);
+                            return prev + 1;
+                        });
+                    }, 400); // 恢復輕快節奏
+                }
+                return () => clearInterval(interval);
+            }, [gameStatus, playTickSound]);
+
+            // Main Game Loop
             useEffect(() => {
                 let interval;
 
-                if (isPlaying) {
+                if (gameStatus === 'playing') {
                     const beatInterval = 60000 / bpm;
                     
                     interval = setInterval(() => {
                         setCurrentBeat((prevBeat) => {
-                            const nextBeat = prevBeat + 1;
-
-                            // 情況 A: 還在 8 張卡片內
-                            if (nextBeat < 8) {
-                                playTickSound(1000, 'triangle'); 
-                                return nextBeat;
-                            } 
-                            
-                            // 情況 B: 一輪結束
-                            if (roundsPlayedRef.current < repeatCount) {
+                            if (prevBeat === 7) {
+                                // 第 8 拍
+                                if (roundsPlayedRef.current < repeatCount) {
+                                    playTickSound(600, 'square', 0.1); 
+                                    return 8; 
+                                } else {
+                                    playTickSound(400, 'sine', 0.5); 
+                                    setGameStatus('idle');
+                                    setIntroRevealedCount(0);
+                                    return prevBeat + 1;
+                                }
+                            } else if (prevBeat === 8) {
+                                // 換輪結束 -> 重新觸發開場動畫
                                 roundsPlayedRef.current += 1;
-                                setCurrentRoundDisplay(roundsPlayedRef.current + 1); 
-                                playTickSound(600, 'square', 0.15);
+                                setCurrentRoundDisplay(roundsPlayedRef.current + 1);
+                                
+                                // === 自動加速邏輯 (所有模式) ===
+                                setBpm(prev => {
+                                    const newBpm = prev + 5;
+                                    return newBpm > 160 ? 160 : newBpm;
+                                });
+                                // =============================
 
                                 if (reshuffleOnLoop) {
                                     shuffleCards();
                                 }
-
+                                
+                                // 重置並進入 Intro
+                                setIntroRevealedCount(0);
+                                setGameStatus('intro');
+                                
                                 return -1; 
                             } else {
-                                // 情況 C: 全部結束
-                                playTickSound(400, 'sine', 0.3);
-                                setIsPlaying(false);
-                                return nextBeat; 
+                                const nextBeat = prevBeat + 1;
+                                if (nextBeat >= 0 && nextBeat < 8) {
+                                    playTickSound(1000, 'triangle', 0.1); 
+                                }
+                                return nextBeat;
                             }
                         });
                     }, beatInterval);
                 }
 
                 return () => clearInterval(interval);
-            }, [isPlaying, bpm, repeatCount, reshuffleOnLoop, shuffleCards, playTickSound]);
+            }, [gameStatus, bpm, repeatCount, reshuffleOnLoop, shuffleCards, playTickSound]);
 
             const handleStart = () => {
-                if (currentBeat >= 7 || currentBeat === -1) {
+                if (!audioContextRef.current) {
+                    audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                if (audioContextRef.current.state === 'suspended') {
+                    audioContextRef.current.resume();
+                }
+
+                if (gameStatus === 'idle' || currentBeat >= 8) {
                     roundsPlayedRef.current = 0; 
                     setCurrentRoundDisplay(1);
                     shuffleCards();
-                    setTimeout(() => {
-                        setCurrentBeat(-1);
-                        setIsPlaying(true);
-                    }, 100);
+                    setIntroRevealedCount(0);
+                    setGameStatus('intro');
                 } else {
-                    setIsPlaying(true);
+                    if (gameStatus === 'playing') {
+                        setGameStatus('idle');
+                    } else {
+                        setGameStatus('playing');
+                    }
                 }
             };
 
             const handleReset = () => {
-                setIsPlaying(false);
+                setGameStatus('idle');
                 setCurrentBeat(-1);
                 roundsPlayedRef.current = 0;
                 setCurrentRoundDisplay(1); 
+                setIntroRevealedCount(0);
                 shuffleCards();
             };
 
@@ -296,11 +348,8 @@
                 const list = tempInput.split(/[\n,、]+/).map(s => s.trim()).filter(s => s.length > 0);
                 if (list.length >= 4) {
                     setVocabList(list);
-                    setSelectedLesson("custom"); // 標記為自定義
-                    
-                    // 儲存到 localStorage
+                    setSelectedLesson("custom"); 
                     localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
-
                     setShowSettings(false);
                     setErrorMsg("");
                     handleReset();
@@ -314,7 +363,6 @@
                     localStorage.removeItem(STORAGE_KEY);
                     setTempInput("");
                     
-                    // 如果目前正在使用自定義生字，則切換回第一課以避免錯誤
                     if (selectedLesson === "custom") {
                         setSelectedLesson(1);
                         setVocabList(LESSONS[0].words.split(''));
@@ -325,13 +373,10 @@
             };
 
             const openSettings = () => {
-                // 如果是自定義模式，且有內容，預設填入目前的 vocabList
-                // 如果是課程模式，預設空白，讓使用者自己輸入
                 if (selectedLesson === "custom" && vocabList.length > 0) {
                      setTempInput(vocabList.join("、"));
                 } else {
                      setTempInput(""); 
-                     // 也可以選擇讀取 localStorage 作為預設值
                      const saved = localStorage.getItem(STORAGE_KEY);
                      if (saved) {
                          try {
@@ -384,7 +429,7 @@
                                     <input 
                                         type="range" 
                                         min="40" 
-                                        max="160" 
+                                        max="180" 
                                         step="5"
                                         value={bpm} 
                                         onChange={(e) => setBpm(parseInt(e.target.value))}
@@ -423,6 +468,7 @@
                                     </option>
                                 ))}
                                 <option disabled>──────────</option>
+                                <option value="review">🔄 綜合複習 (全 12 課隨機)</option>
                                 <option value="custom">✏️ 自定義生字 (我的最愛)</option>
                              </select>
                         </div>
@@ -435,8 +481,18 @@
                         {/* 卡片網格 */}
                         <div className="grid grid-cols-4 gap-4 w-full aspect-[2/1] md:aspect-[8/3]">
                             {activeCards.map((word, index) => {
-                                const isRevealed = index <= currentBeat;
-                                const isJustRevealed = index === currentBeat;
+                                // Visibility Logic
+                                let isRevealed = false;
+                                let isHighlighted = false;
+
+                                if (gameStatus === 'intro') {
+                                    isRevealed = index < introRevealedCount;
+                                } else if (gameStatus === 'playing') {
+                                    isRevealed = currentBeat !== 8;
+                                    isHighlighted = index === currentBeat;
+                                } else {
+                                    isRevealed = false;
+                                }
                                 
                                 return (
                                     <div key={index} className="relative w-full h-full perspective-1000">
@@ -444,17 +500,17 @@
                                             className={`relative w-full h-full duration-500 preserve-3d transition-transform ${isRevealed ? 'rotate-y-0' : 'rotate-y-180'}`}
                                             style={{ transformStyle: 'preserve-3d', transform: isRevealed ? 'rotateY(0deg)' : 'rotateY(180deg)' }}
                                         >
-                                            {/* 正面 */}
+                                            {/* 正面 (內容) */}
                                             <div className={`absolute w-full h-full backface-hidden rounded-xl shadow-lg flex items-center justify-center text-3xl md:text-4xl font-bold select-none border-4
-                                                ${isJustRevealed 
-                                                    ? 'bg-indigo-50 border-indigo-400 text-indigo-700 scale-105 z-10 ring-4 ring-indigo-200' 
+                                                ${isHighlighted 
+                                                    ? 'bg-yellow-100 border-yellow-400 text-indigo-700 scale-105 z-10 ring-4 ring-yellow-200' 
                                                     : 'bg-white border-slate-200 text-slate-700 scale-100'}
-                                                transition-all duration-300
+                                                transition-all duration-150
                                             `}>
                                                 {word}
                                             </div>
 
-                                            {/* 背面 */}
+                                            {/* 背面 (蓋牌) */}
                                             <div 
                                                 className="absolute w-full h-full backface-hidden rounded-xl shadow-md bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center border-4 border-white"
                                                 style={{ transform: 'rotateY(180deg)' }}
@@ -469,7 +525,7 @@
 
                         {/* 底部播放控制 */}
                         <div className="mt-8 flex justify-center gap-6">
-                            {!isPlaying && currentBeat === -1 && (
+                            {gameStatus === 'idle' && (
                                 <button 
                                     onClick={handleStart}
                                     className="group flex flex-col items-center gap-2"
@@ -481,9 +537,9 @@
                                 </button>
                             )}
 
-                            {isPlaying && (
+                            {(gameStatus === 'playing' || gameStatus === 'intro') && (
                                 <button 
-                                    onClick={() => setIsPlaying(false)}
+                                    onClick={() => setGameStatus('idle')}
                                     className="group flex flex-col items-center gap-2"
                                 >
                                     <div className="w-16 h-16 bg-red-500 rounded-full flex items-center justify-center shadow-lg shadow-red-300 group-hover:scale-110 transition-transform">
@@ -493,26 +549,30 @@
                                 </button>
                             )}
 
-                            {(!isPlaying && currentBeat !== -1) && (
+                            {/* 只要不是完全初始狀態 (未玩過)，就顯示重置按鈕 */}
+                            {(roundsPlayedRef.current > 0 || currentBeat !== -1 || gameStatus !== 'idle') && (
                                 <div className="flex gap-6">
-                                    <button 
-                                        onClick={handleStart}
-                                        className="group flex flex-col items-center gap-2"
-                                    >
-                                        <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center shadow-lg shadow-green-300 group-hover:scale-110 transition-transform">
-                                            <Play fill="white" className="ml-1 text-white" size={32} />
-                                        </div>
-                                        <span className="font-bold text-green-600">繼續</span>
-                                    </button>
+                                    {/* 暫停時顯示繼續按鈕 */}
+                                    {gameStatus === 'idle' && currentBeat !== -1 && (
+                                        <button 
+                                            onClick={() => setGameStatus('playing')}
+                                            className="group flex flex-col items-center gap-2"
+                                        >
+                                            <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center shadow-lg shadow-green-300 group-hover:scale-110 transition-transform">
+                                                <Play fill="white" className="ml-1 text-white" size={32} />
+                                            </div>
+                                            <span className="font-bold text-green-600">繼續</span>
+                                        </button>
+                                    )}
 
                                     <button 
                                         onClick={handleReset}
                                         className="group flex flex-col items-center gap-2"
                                     >
-                                        <div className="w-16 h-16 bg-slate-200 rounded-full flex items-center justify-center group-hover:bg-slate-300 transition-colors">
-                                            <RotateCcw className="text-slate-600" size={32} />
+                                        <div className="w-16 h-16 bg-amber-500 rounded-full flex items-center justify-center shadow-lg shadow-amber-300 group-hover:scale-110 transition-transform">
+                                            <RefreshCw className="text-white" size={32} />
                                         </div>
-                                        <span className="font-bold text-slate-500">重置</span>
+                                        <span className="font-bold text-amber-600">重置</span>
                                     </button>
                                 </div>
                             )}
@@ -558,7 +618,7 @@
                                                     <span className="block font-bold text-slate-800 text-sm">簡單模式 (Easy)</span>
                                                     <span className="text-xs text-slate-500">
                                                         每次選出 <strong className="text-green-600">4 個生字</strong>，每個字出現 <strong className="text-green-600">2 次</strong>。
-                                                        <br/>適合初學者熟悉單字。
+                                                        <br/>適合初學者熟悉單字。<span className="text-red-500 font-bold ml-1">(每輪自動加速 +5 BPM，上限 160)</span>
                                                     </span>
                                                 </div>
                                             </label>
@@ -577,7 +637,7 @@
                                                     <span className="block font-bold text-slate-800 text-sm">進階模式 (Advanced)</span>
                                                     <span className="text-xs text-slate-500">
                                                         每次選出 <strong className="text-orange-600">8 個不重複</strong>的生字。
-                                                        <br/>適合挑戰反應速度與大量單字。
+                                                        <br/>適合挑戰反應速度與大量單字。<span className="text-red-500 font-bold ml-1">(每輪自動加速 +5 BPM，上限 160)</span>
                                                     </span>
                                                 </div>
                                             </label>

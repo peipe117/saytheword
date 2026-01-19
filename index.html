@@ -72,6 +72,8 @@
         const Sparkles = (props) => <IconWrapper {...props}><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275Z"></path></IconWrapper>;
         const BookOpen = (props) => <IconWrapper {...props}><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></IconWrapper>;
         const Trash2 = (props) => <IconWrapper {...props}><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path><line x1="10" x2="10" y1="11" y2="17"></line><line x1="14" x2="14" y1="11" y2="17"></line></IconWrapper>;
+        const Volume = (props) => <IconWrapper {...props}><path d="M11 5L6 9H2v6h4l5 4V5z"></path><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path></IconWrapper>;
+        const Mic = (props) => <IconWrapper {...props}><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" x2="12" y1="19" y2="23"></line><line x1="8" x2="16" y1="23" y2="23"></line></IconWrapper>;
 
         // --- Main Game Component ---
         const LESSONS = [
@@ -117,11 +119,13 @@
             const [repeatCount, setRepeatCount] = useState(0); 
             const [reshuffleOnLoop, setReshuffleOnLoop] = useState(true);
             const [difficulty, setDifficulty] = useState('easy');
+            const [playMode, setPlayMode] = useState('challenge'); // 'practice' | 'challenge'
             const [currentRoundDisplay, setCurrentRoundDisplay] = useState(1);
 
             // Refs
             const roundsPlayedRef = useRef(0);
             const audioContextRef = useRef(null);
+            const utteranceRef = useRef(null); // Keep reference to prevent GC
 
             // 初始化/洗牌邏輯
             const shuffleCards = useCallback(() => {
@@ -157,6 +161,12 @@
             // 初始掛載
             useEffect(() => {
                 shuffleCards();
+                // Cleanup speech on unmount
+                return () => {
+                    if (window.speechSynthesis) {
+                        window.speechSynthesis.cancel();
+                    }
+                };
             }, [shuffleCards]);
 
             // 處理課程選擇
@@ -187,7 +197,6 @@
                     }
                 } else if (val === "review") {
                     setSelectedLesson("review");
-                    // 將所有課程的生字合併成一個大陣列
                     const allWords = LESSONS.flatMap(lesson => lesson.words.split(''));
                     setVocabList(allWords);
                 } else {
@@ -199,6 +208,32 @@
                     }
                 }
             };
+
+            // 語音朗讀 (TTS) - 增強版
+            const speakWord = useCallback((text) => {
+                if (!window.speechSynthesis || !text) return;
+                
+                // 停止之前的發音，避免重疊
+                window.speechSynthesis.cancel();
+
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'zh-TW'; 
+                utterance.rate = 1.0; 
+                
+                // 將 utterance 存入 ref，防止被瀏覽器垃圾回收導致發音中斷
+                utteranceRef.current = utterance;
+                
+                // 防止快速切換時的錯誤
+                utterance.onerror = (e) => {
+                    // 忽略被中斷的錯誤 (這在節奏遊戲中是正常的)
+                    if (e.error === 'interrupted' || e.error === 'canceled') {
+                        return;
+                    }
+                    console.error("Speech error", e.error, e);
+                };
+
+                window.speechSynthesis.speak(utterance);
+            }, []);
 
             // 音效處理 - 使用 Oscillator (嗶嗶聲)
             const playTickSound = useCallback((frequency = 800, type = 'sine', duration = 0.1) => {
@@ -252,7 +287,7 @@
                             playTickSound(600, 'sine', 0.05);
                             return prev + 1;
                         });
-                    }, 400); // 恢復輕快節奏
+                    }, 400); 
                 }
                 return () => clearInterval(interval);
             }, [gameStatus, playTickSound]);
@@ -267,7 +302,7 @@
                     interval = setInterval(() => {
                         setCurrentBeat((prevBeat) => {
                             if (prevBeat === 7) {
-                                // 第 8 拍
+                                // 第 8 拍 (換輪/結束)
                                 if (roundsPlayedRef.current < repeatCount) {
                                     playTickSound(600, 'square', 0.1); 
                                     return 8; 
@@ -282,18 +317,15 @@
                                 roundsPlayedRef.current += 1;
                                 setCurrentRoundDisplay(roundsPlayedRef.current + 1);
                                 
-                                // === 自動加速邏輯 (所有模式) ===
                                 setBpm(prev => {
                                     const newBpm = prev + 5;
                                     return newBpm > 160 ? 160 : newBpm;
                                 });
-                                // =============================
 
                                 if (reshuffleOnLoop) {
                                     shuffleCards();
                                 }
                                 
-                                // 重置並進入 Intro
                                 setIntroRevealedCount(0);
                                 setGameStatus('intro');
                                 
@@ -301,7 +333,15 @@
                             } else {
                                 const nextBeat = prevBeat + 1;
                                 if (nextBeat >= 0 && nextBeat < 8) {
-                                    playTickSound(1000, 'triangle', 0.1); 
+                                    // 判斷是否為練習模式
+                                    if (playMode === 'practice') {
+                                        // 練習模式：朗讀生字
+                                        const wordToRead = activeCards[nextBeat];
+                                        if (wordToRead) speakWord(wordToRead);
+                                    } else {
+                                        // 挑戰模式：只播放節拍
+                                        playTickSound(1000, 'triangle', 0.1); 
+                                    }
                                 }
                                 return nextBeat;
                             }
@@ -310,7 +350,7 @@
                 }
 
                 return () => clearInterval(interval);
-            }, [gameStatus, bpm, repeatCount, reshuffleOnLoop, shuffleCards, playTickSound]);
+            }, [gameStatus, bpm, repeatCount, reshuffleOnLoop, shuffleCards, playTickSound, playMode, activeCards, speakWord]);
 
             const handleStart = () => {
                 if (!audioContextRef.current) {
@@ -329,6 +369,7 @@
                 } else {
                     if (gameStatus === 'playing') {
                         setGameStatus('idle');
+                        window.speechSynthesis.cancel();
                     } else {
                         setGameStatus('playing');
                     }
@@ -341,6 +382,7 @@
                 roundsPlayedRef.current = 0;
                 setCurrentRoundDisplay(1); 
                 setIntroRevealedCount(0);
+                window.speechSynthesis.cancel();
                 shuffleCards();
             };
 
@@ -408,6 +450,11 @@
                                         {difficulty === 'easy' ? '簡單模式' : '進階模式'}
                                     </span>
                                     
+                                    <span className={`px-2 py-0.5 rounded-full text-xs flex items-center gap-1 ${playMode === 'practice' ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700'}`}>
+                                        {playMode === 'practice' ? <Volume size={10} /> : <Mic size={10} />}
+                                        {playMode === 'practice' ? '練習模式 (朗讀)' : '挑戰模式 (跟讀)'}
+                                    </span>
+
                                     {repeatCount > 0 ? (
                                         <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
                                             <Repeat size={10} />
@@ -580,7 +627,7 @@
                     </div>
 
                     <div className="mt-8 text-slate-400 text-sm font-medium">
-                        Sophia Wong 修訂
+                        Design by Sophia
                     </div>
 
                     {/* 設定 Modal */}
@@ -597,11 +644,55 @@
                                 </div>
                                 
                                 <div className="p-6 overflow-y-auto">
+
+                                    {/* 0. 模式選擇 */}
+                                    <div className="mb-6 p-4 bg-slate-50 rounded-xl border border-slate-100">
+                                        <h3 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
+                                            <Mic size={16} /> 模式選擇
+                                        </h3>
+                                        <div className="flex flex-col gap-3">
+                                            {/* 挑戰模式 */}
+                                            <label className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all ${playMode === 'challenge' ? 'bg-red-50 border-red-400 shadow-sm ring-1 ring-red-100' : 'border-transparent hover:bg-white'}`}>
+                                                <input 
+                                                    type="radio" 
+                                                    name="playMode"
+                                                    value="challenge"
+                                                    checked={playMode === 'challenge'}
+                                                    onChange={() => setPlayMode('challenge')}
+                                                    className="mt-1 w-4 h-4 text-red-600 border-gray-300 focus:ring-red-500"
+                                                />
+                                                <div>
+                                                    <span className="block font-bold text-slate-800 text-sm">挑戰模式 (Challenge)</span>
+                                                    <span className="text-xs text-slate-500">
+                                                        亮牌時<strong className="text-red-600">不讀字</strong>，只有節拍聲。請學生大聲唸出卡片內容。
+                                                    </span>
+                                                </div>
+                                            </label>
+
+                                            {/* 練習模式 */}
+                                            <label className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all ${playMode === 'practice' ? 'bg-blue-50 border-blue-400 shadow-sm ring-1 ring-blue-100' : 'border-transparent hover:bg-white'}`}>
+                                                <input 
+                                                    type="radio" 
+                                                    name="playMode"
+                                                    value="practice"
+                                                    checked={playMode === 'practice'}
+                                                    onChange={() => setPlayMode('practice')}
+                                                    className="mt-1 w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                                                />
+                                                <div>
+                                                    <span className="block font-bold text-slate-800 text-sm">練習模式 (Practice)</span>
+                                                    <span className="text-xs text-slate-500">
+                                                        亮牌時<strong className="text-blue-600">自動讀字</strong> (TTS)。適合初學或複習發音。
+                                                    </span>
+                                                </div>
+                                            </label>
+                                        </div>
+                                    </div>
                                     
                                     {/* 1. 難度設定 */}
                                     <div className="mb-6 p-4 bg-slate-50 rounded-xl border border-slate-100">
                                         <h3 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
-                                            <BrainCircuit size={16} /> 難度模式
+                                            <BrainCircuit size={16} /> 卡片難度
                                         </h3>
                                         <div className="flex flex-col gap-3">
                                             {/* 簡單模式選項 */}

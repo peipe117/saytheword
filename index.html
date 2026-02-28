@@ -120,6 +120,13 @@
         const DEFAULT_MUSIC_NAME = "saytheword.m4a";
         // ==========================================
 
+        // ⭐ 新增：Emoji 發音對照表 (確保各平台語音都能唸出正確的單字)
+        const EMOJI_PRONUNCIATION_MAP = {
+            "🐭": "鼠", "🐮": "牛", "🐯": "虎", "🐰": "兔",
+            "🐲": "龍", "🐍": "蛇", "🐴": "馬", "🐑": "羊",
+            "🐵": "猴", "🐔": "雞", "🐶": "狗", "🐷": "豬"
+        };
+
         const BeatGame = () => {
             // 修正：使用展開運算子 [...] 取代 .split('')，以完美支援 emoji 圖案
             const [vocabList, setVocabList] = useState([...LESSONS[0].words]);
@@ -230,8 +237,14 @@
             const speakWord = useCallback((text, currentBpm) => {
                 if (!window.speechSynthesis || !text) return;
                 window.speechSynthesis.cancel();
-                const utterance = new SpeechSynthesisUtterance(text);
-                utterance.lang = 'zh-TW'; 
+                
+                // 檢查是否為特殊 emoji，如果是，則轉換為對應的單一中文字來發音
+                const textToSpeak = EMOJI_PRONUNCIATION_MAP[text] || text;
+                
+                const utterance = new SpeechSynthesisUtterance(textToSpeak);
+                utterance.lang = 'zh-TW'; // 強制使用繁體中文(台灣)語音
+                
+                // 為了確保跨平台相容性，這裡可以加上語音包篩選，但通常設定 lang 就足夠
                 const speechRate = Math.min(Math.max(1, currentBpm / 60), 2.5);
                 utterance.rate = speechRate; 
                 utteranceRef.current = utterance;

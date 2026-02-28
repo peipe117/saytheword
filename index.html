@@ -106,7 +106,8 @@
             { id: 9, name: "第九課：音樂教室在北方", words: "南北方裡校門口因為所" },
             { id: 10, name: "第十課：外婆住在臺灣", words: "本著退休次旅行法國" },
             { id: 11, name: "第十一課：去動物園", words: "動物園老希望但胖真長" },
-            { id: 12, name: "第十二課：打網路電話", words: "久話高課寫沒題定意思" }
+            { id: 12, name: "第十二課：打網路電話", words: "久話高課寫沒題定意思" },
+            { id: 13, name: "十二生肖", words: "🐭🐮🐯🐰🐲🐍🐴🐑🐵🐔🐶🐷" }
         ];
 
         const STORAGE_KEY = 'beatGame_custom_list';
@@ -120,7 +121,8 @@
         // ==========================================
 
         const BeatGame = () => {
-            const [vocabList, setVocabList] = useState(LESSONS[0].words.split(''));
+            // 修正：使用展開運算子 [...] 取代 .split('')，以完美支援 emoji 圖案
+            const [vocabList, setVocabList] = useState([...LESSONS[0].words]);
             const [activeCards, setActiveCards] = useState([]);
             const [gameStatus, setGameStatus] = useState('idle');
             const [currentBeat, setCurrentBeat] = useState(-1);
@@ -213,13 +215,15 @@
                     }
                 } else if (val === "review") {
                     setSelectedLesson("review");
-                    const allWords = LESSONS.flatMap(lesson => lesson.words.split(''));
+                    // 修正：支援 emoji
+                    const allWords = LESSONS.flatMap(lesson => [...lesson.words]);
                     setVocabList(allWords);
                 } else {
                     const lessonId = parseInt(val);
                     setSelectedLesson(lessonId);
                     const lesson = LESSONS.find(l => l.id === lessonId);
-                    if (lesson) setVocabList(lesson.words.split(''));
+                    // 修正：支援 emoji
+                    if (lesson) setVocabList([...lesson.words]);
                 }
             };
 
@@ -479,7 +483,8 @@
                     setTempInput("");
                     if (selectedLesson === "custom") {
                         setSelectedLesson(1);
-                        setVocabList(LESSONS[0].words.split(''));
+                        // 修正：支援 emoji
+                        setVocabList([...LESSONS[0].words]);
                         handleReset();
                     }
                     setErrorMsg("已清除自定義紀錄");

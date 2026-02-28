@@ -6,6 +6,10 @@
     <title>Say the Word on Beat Game</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Noto Sans TC -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
     <!-- React & ReactDOM -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -13,6 +17,9 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     
     <style>
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+        }
         .perspective-1000 { perspective: 1000px; }
         .preserve-3d { transform-style: preserve-3d; }
         .backface-hidden { backface-visibility: hidden; }
@@ -20,22 +27,35 @@
         .rotate-y-0 { transform: rotateY(0deg); }
         
         /* Custom scrollbar for settings */
-        textarea::-webkit-scrollbar {
-            width: 8px;
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        /* 左右晃動動畫 */
+        @keyframes shake-lr {
+            0%, 100% { transform: translateX(0) rotate(0deg); }
+            25% { transform: translateX(-5px) rotate(-6deg) scale(1.1); }
+            75% { transform: translateX(5px) rotate(6deg) scale(1.1); }
         }
-        textarea::-webkit-scrollbar-track {
-            background: #f1f1f1; 
+        .shake-active {
+            animation: shake-lr 0.5s ease-in-out infinite;
+            display: inline-flex;
+            filter: drop-shadow(0 10px 15px rgba(0,0,0,0.1));
         }
-        textarea::-webkit-scrollbar-thumb {
-            background: #888; 
-            border-radius: 4px;
+
+        /* 按鈕點擊動畫防抖 */
+        .push-btn {
+            transition: all 0.1s cubic-bezier(0.4, 0, 0.2, 1);
         }
-        textarea::-webkit-scrollbar-thumb:hover {
-            background: #555; 
+        .push-btn:active {
+            transform: translateY(4px);
+            border-bottom-width: 0px;
+            margin-top: 4px;
         }
     </style>
 </head>
-<body class="bg-slate-100">
+<body class="bg-slate-50 text-slate-800 antialiased selection:bg-indigo-200">
     <div id="root"></div>
 
     <script type="text/babel">
@@ -43,24 +63,14 @@
 
         // --- Icon Components (SVG) ---
         const IconWrapper = ({ children, size = 24, className = "", ...props }) => (
-            <svg 
-                xmlns="http://www.w3.org/2000/svg" 
-                width={size} 
-                height={size} 
-                viewBox="0 0 24 24" 
-                fill="none" 
-                stroke="currentColor" 
-                strokeWidth="2" 
-                strokeLinecap="round" 
-                strokeLinejoin="round" 
-                className={className} 
-                {...props}
-            >
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>
                 {children}
             </svg>
         );
 
         const Play = (props) => <IconWrapper {...props}><polygon points="5 3 19 12 5 21 5 3"></polygon></IconWrapper>;
+        const Pause = (props) => <IconWrapper {...props}><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></IconWrapper>;
+        const Check = (props) => <IconWrapper {...props}><polyline points="20 6 9 17 4 12"></polyline></IconWrapper>;
         const RefreshCw = (props) => <IconWrapper {...props}><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 12"></path><path d="M21 3v9h-9"></path></IconWrapper>;
         const Settings = (props) => <IconWrapper {...props}><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-1-1.72v-.51a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></IconWrapper>;
         const X = (props) => <IconWrapper {...props}><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></IconWrapper>;
@@ -74,6 +84,12 @@
         const Trash2 = (props) => <IconWrapper {...props}><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path><line x1="10" x2="10" y1="11" y2="17"></line><line x1="14" x2="14" y1="11" y2="17"></line></IconWrapper>;
         const Volume = (props) => <IconWrapper {...props}><path d="M11 5L6 9H2v6h4l5 4V5z"></path><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path></IconWrapper>;
         const Mic = (props) => <IconWrapper {...props}><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" x2="12" y1="19" y2="23"></line><line x1="8" x2="16" y1="23" y2="23"></line></IconWrapper>;
+        const Music = (props) => <IconWrapper {...props}><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></IconWrapper>;
+        const Upload = (props) => <IconWrapper {...props}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" x2="12" y1="3" y2="15"></line></IconWrapper>;
+        const Megaphone = (props) => <IconWrapper {...props}><path d="m3 11 18-5v12L3 14v-3z"></path><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"></path></IconWrapper>;
+        const Zap = (props) => <IconWrapper {...props}><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></IconWrapper>;
+        const Lightbulb = (props) => <IconWrapper {...props}><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.9 1.3 1.5 1.5 2.5"></path><path d="M9 18h6"></path><path d="M10 22h4"></path></IconWrapper>;
+        const Exclamation = (props) => <IconWrapper {...props}><path d="M12 3v12" strokeWidth="3"></path><circle cx="12" cy="20" r="2" fill="currentColor"></circle></IconWrapper>;
 
         // --- Main Game Component ---
         const LESSONS = [
@@ -93,87 +109,84 @@
 
         const STORAGE_KEY = 'beatGame_custom_list';
 
+        // ==========================================
+        // ⭐ 音樂自動播放設定區 ⭐
+        // ==========================================
+        const DEFAULT_MUSIC_URL = ""; 
+        const DEFAULT_MUSIC_NAME = "我的專屬音樂";
+        // ==========================================
+
         const BeatGame = () => {
-            // 狀態管理
             const [vocabList, setVocabList] = useState(LESSONS[0].words.split(''));
             const [activeCards, setActiveCards] = useState([]);
-            
-            // Game Status
             const [gameStatus, setGameStatus] = useState('idle');
             const [currentBeat, setCurrentBeat] = useState(-1);
-            
-            // For Intro Animation
             const [introRevealedCount, setIntroRevealedCount] = useState(0); 
-            
-            // 設定相關
             const [showSettings, setShowSettings] = useState(false);
             const [tempInput, setTempInput] = useState("");
-            const [bpm, setBpm] = useState(60);
+            const [bpm, setBpm] = useState(120);
             const [soundEnabled, setSoundEnabled] = useState(true);
             const [errorMsg, setErrorMsg] = useState("");
             
-            // 課程選擇
+            // 使用上方的設定作為預設值
+            const [introMusicSrc, setIntroMusicSrc] = useState(DEFAULT_MUSIC_URL);
+            const [introMusicName, setIntroMusicName] = useState(DEFAULT_MUSIC_URL ? DEFAULT_MUSIC_NAME : "未選擇");
+            const introAudioRef = useRef(null);
             const [selectedLesson, setSelectedLesson] = useState(1);
-
-            // 循環與難度功能狀態
-            const [repeatCount, setRepeatCount] = useState(0); 
+            const [totalRounds, setTotalRounds] = useState(5); 
             const [reshuffleOnLoop, setReshuffleOnLoop] = useState(true);
             const [difficulty, setDifficulty] = useState('easy');
-            const [playMode, setPlayMode] = useState('challenge'); // 'practice' | 'challenge'
+            const [playMode, setPlayMode] = useState('challenge'); // 改為預設挑戰模式
             const [currentRoundDisplay, setCurrentRoundDisplay] = useState(1);
+            const [isWaitingForMusic, setIsWaitingForMusic] = useState(false); // 新增等待音樂狀態
 
-            // Refs
             const roundsPlayedRef = useRef(0);
             const audioContextRef = useRef(null);
-            const utteranceRef = useRef(null); // Keep reference to prevent GC
+            const utteranceRef = useRef(null);
+            const deckRef = useRef([]); // 新增：用於記錄還沒抽過的生字牌庫（摸彩箱機制）
 
-            // 初始化/洗牌邏輯
-            const shuffleCards = useCallback(() => {
+            const shuffleCards = useCallback((isNewGame = false) => {
                 let selected = [];
-                const shuffledVocab = [...vocabList].sort(() => 0.5 - Math.random());
+                let needed = difficulty === 'easy' ? 4 : 8;
+                let drawn = [];
+
+                // 如果是新局，或是牌庫空了，就重新洗入所有的生字
+                if (isNewGame === true || deckRef.current.length === 0) {
+                    deckRef.current = [...vocabList].sort(() => 0.5 - Math.random());
+                }
+
+                // 從牌庫中抽出需要的數量，確保每一個生字都會被抽到
+                while (drawn.length < needed) {
+                    if (deckRef.current.length === 0) {
+                        // 如果抽到一半沒牌了，自動重新洗牌補充，確保所有字都有均等機會出現
+                        deckRef.current = [...vocabList].sort(() => 0.5 - Math.random());
+                    }
+                    if (deckRef.current.length === 0) break; // 避免無字可抽的無窮迴圈
+                    drawn.push(deckRef.current.pop());
+                }
+
+                // 容錯防呆處理
+                if (drawn.length === 0) drawn = Array(needed).fill("?");
+                while (drawn.length < needed) drawn.push(drawn[0]);
 
                 if (difficulty === 'easy') {
-                    // 簡單模式：選 4 個字，各重複 2 次
-                    let source = shuffledVocab;
-                    if (source.length < 4 && source.length > 0) {
-                        while (source.length < 4) {
-                            source = source.concat(source);
-                        }
-                    }
-                    if (source.length >= 4) {
-                         const picked4 = source.slice(0, 4);
-                         const pairs = [...picked4, ...picked4];
-                         selected = pairs.sort(() => 0.5 - Math.random());
-                    } else {
-                         selected = Array(8).fill("?");
-                    }
-
+                    const pairs = [...drawn, ...drawn];
+                    selected = pairs.sort(() => 0.5 - Math.random());
                 } else {
-                    // 進階模式：選 8 個不同字
-                    selected = shuffledVocab.slice(0, 8);
-                    while (selected.length < 8 && selected.length > 0) {
-                        selected = selected.concat(shuffledVocab).slice(0, 8);
-                    }
+                    selected = drawn.sort(() => 0.5 - Math.random());
                 }
                 setActiveCards(selected);
             }, [vocabList, difficulty]);
 
-            // 初始掛載
             useEffect(() => {
-                shuffleCards();
-                // Cleanup speech on unmount
+                shuffleCards(true);
                 return () => {
-                    if (window.speechSynthesis) {
-                        window.speechSynthesis.cancel();
-                    }
+                    if (window.speechSynthesis) window.speechSynthesis.cancel();
                 };
             }, [shuffleCards]);
 
-            // 處理課程選擇
             const handleLessonChange = (e) => {
                 const val = e.target.value;
-                
-                // 重置遊戲
                 setGameStatus('idle');
                 setCurrentBeat(-1);
                 roundsPlayedRef.current = 0;
@@ -185,8 +198,7 @@
                     const savedList = localStorage.getItem(STORAGE_KEY);
                     if (savedList) {
                         try {
-                            const parsedList = JSON.parse(savedList);
-                            setVocabList(parsedList);
+                            setVocabList(JSON.parse(savedList));
                         } catch (e) {
                             setVocabList([]);
                             openSettings();
@@ -203,156 +215,187 @@
                     const lessonId = parseInt(val);
                     setSelectedLesson(lessonId);
                     const lesson = LESSONS.find(l => l.id === lessonId);
-                    if (lesson) {
-                        setVocabList(lesson.words.split(''));
-                    }
+                    if (lesson) setVocabList(lesson.words.split(''));
                 }
             };
 
-            // 語音朗讀 (TTS) - 增強版
-            const speakWord = useCallback((text) => {
+            const speakWord = useCallback((text, currentBpm) => {
                 if (!window.speechSynthesis || !text) return;
-                
-                // 停止之前的發音，避免重疊
                 window.speechSynthesis.cancel();
-
                 const utterance = new SpeechSynthesisUtterance(text);
                 utterance.lang = 'zh-TW'; 
-                utterance.rate = 1.0; 
-                
-                // 將 utterance 存入 ref，防止被瀏覽器垃圾回收導致發音中斷
+                const speechRate = Math.min(Math.max(1, currentBpm / 60), 2.5);
+                utterance.rate = speechRate; 
                 utteranceRef.current = utterance;
-                
-                // 防止快速切換時的錯誤
                 utterance.onerror = (e) => {
-                    // 忽略被中斷的錯誤 (這在節奏遊戲中是正常的)
-                    if (e.error === 'interrupted' || e.error === 'canceled') {
-                        return;
-                    }
+                    if (e.error === 'interrupted' || e.error === 'canceled') return;
                     console.error("Speech error", e.error, e);
                 };
-
                 window.speechSynthesis.speak(utterance);
             }, []);
 
-            // 音效處理 - 使用 Oscillator (嗶嗶聲)
             const playTickSound = useCallback((frequency = 800, type = 'sine', duration = 0.1) => {
                 if (!soundEnabled) return;
-                
                 try {
-                    if (!audioContextRef.current) {
-                        const AudioContext = window.AudioContext || window.webkitAudioContext;
-                        if (AudioContext) {
-                            audioContextRef.current = new AudioContext();
-                        }
+                    let ctx = audioContextRef.current;
+                    if (!ctx) {
+                        ctx = new (window.AudioContext || window.webkitAudioContext)();
+                        audioContextRef.current = ctx;
                     }
-                    const ctx = audioContextRef.current;
-                    if (ctx && ctx.state === 'suspended') ctx.resume();
 
-                    if (ctx) {
+                    const playNode = () => {
                         const osc = ctx.createOscillator();
                         const gainNode = ctx.createGain();
-
                         osc.type = type;
                         osc.frequency.setValueAtTime(frequency, ctx.currentTime);
-                        
                         gainNode.gain.setValueAtTime(0.1, ctx.currentTime);
                         gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
-
                         osc.connect(gainNode);
                         gainNode.connect(ctx.destination);
-
-                        osc.start();
+                        osc.start(ctx.currentTime);
                         osc.stop(ctx.currentTime + duration);
+                    };
+
+                    if (ctx.state === 'suspended') {
+                        ctx.resume().then(playNode);
+                    } else {
+                        playNode();
                     }
                 } catch (e) {
                     console.error("Audio play error", e);
                 }
             }, [soundEnabled]);
 
-            // Intro Animation Loop
+            const handleIntroMusicUpload = (event) => {
+                const file = event.target.files?.[0];
+                if (file) {
+                    setIntroMusicSrc(URL.createObjectURL(file));
+                    setIntroMusicName(file.name);
+                }
+            };
+
+            // 1. 翻牌動畫進度
             useEffect(() => {
                 let interval;
                 if (gameStatus === 'intro') {
                     interval = setInterval(() => {
                         setIntroRevealedCount(prev => {
-                            if (prev >= 8) {
-                                // Animation finished, start playing
+                            if (prev >= 7) {
                                 clearInterval(interval);
-                                setGameStatus('playing');
-                                setCurrentBeat(-1);
+                                playTickSound(1200, 'square', 0.08); 
                                 return 8; 
                             }
-                            // Play a soft tick for reveal effect
-                            playTickSound(600, 'sine', 0.05);
+                            playTickSound(1200, 'square', 0.08); 
                             return prev + 1;
                         });
-                    }, 400); 
+                    }, 362); // 8張約 2.9 秒
                 }
                 return () => clearInterval(interval);
             }, [gameStatus, playTickSound]);
 
-            // Main Game Loop
+            // 2. 判斷翻完且音樂結束後，立即無縫接軌進入遊戲狀態
             useEffect(() => {
-                let interval;
-
-                if (gameStatus === 'playing') {
-                    const beatInterval = 60000 / bpm;
-                    
-                    interval = setInterval(() => {
-                        setCurrentBeat((prevBeat) => {
-                            if (prevBeat === 7) {
-                                // 第 8 拍 (換輪/結束)
-                                if (roundsPlayedRef.current < repeatCount) {
-                                    playTickSound(600, 'square', 0.1); 
-                                    return 8; 
-                                } else {
-                                    playTickSound(400, 'sine', 0.5); 
-                                    setGameStatus('idle');
-                                    setIntroRevealedCount(0);
-                                    return prevBeat + 1;
-                                }
-                            } else if (prevBeat === 8) {
-                                // 換輪結束 -> 重新觸發開場動畫
-                                roundsPlayedRef.current += 1;
-                                setCurrentRoundDisplay(roundsPlayedRef.current + 1);
-                                
-                                setBpm(prev => {
-                                    const newBpm = prev + 5;
-                                    return newBpm > 160 ? 160 : newBpm;
-                                });
-
-                                if (reshuffleOnLoop) {
-                                    shuffleCards();
-                                }
-                                
-                                setIntroRevealedCount(0);
-                                setGameStatus('intro');
-                                
-                                return -1; 
-                            } else {
-                                const nextBeat = prevBeat + 1;
-                                if (nextBeat >= 0 && nextBeat < 8) {
-                                    // 判斷是否為練習模式
-                                    if (playMode === 'practice') {
-                                        // 練習模式：朗讀生字
-                                        const wordToRead = activeCards[nextBeat];
-                                        if (wordToRead) speakWord(wordToRead);
-                                    } else {
-                                        // 挑戰模式：只播放節拍
-                                        playTickSound(1000, 'triangle', 0.1); 
-                                    }
-                                }
-                                return nextBeat;
-                            }
-                        });
-                    }, beatInterval);
+                if (gameStatus === 'intro' && introRevealedCount >= 8 && !isWaitingForMusic) {
+                    setGameStatus('playing');
+                    setCurrentBeat(-1);
                 }
+            }, [gameStatus, introRevealedCount, isWaitingForMusic]);
 
-                return () => clearInterval(interval);
-            }, [gameStatus, bpm, repeatCount, reshuffleOnLoop, shuffleCards, playTickSound, playMode, activeCards, speakWord]);
+            // 3. 使用 useRef 穩定節奏，防止畫面重新渲染影響節拍器
+            const beatStateRef = useRef({ currentBeat, playMode, bpm, activeCards });
+            useEffect(() => {
+                beatStateRef.current = { currentBeat, playMode, bpm, activeCards };
+            }, [currentBeat, playMode, bpm, activeCards]);
+
+            // 4. ⭐ 核心：完美無縫節拍器 (改用遞迴 setTimeout，解決音效重疊問題)
+            useEffect(() => {
+                let timer;
+                if (gameStatus === 'playing') {
+                    const tick = () => {
+                        const state = beatStateRef.current;
+                        
+                        // 若 8 張牌已輪完，關閉節拍器並進入等待蓋牌
+                        if (state.currentBeat >= 7) {
+                            setCurrentBeat(9);
+                            return; 
+                        }
+                        
+                        const nextBeat = state.currentBeat + 1;
+                        if (nextBeat >= 0 && nextBeat <= 7) {
+                            if (state.playMode === 'practice') {
+                                const wordToRead = state.activeCards[nextBeat];
+                                if (wordToRead) speakWord(wordToRead, state.bpm);
+                            } else {
+                                playTickSound(1000, 'triangle', 0.1); 
+                            }
+                        }
+                        setCurrentBeat(nextBeat); // 觸發畫面更新與黃框閃爍
+                        
+                        // 排程下一拍
+                        timer = setTimeout(tick, 60000 / state.bpm);
+                    };
+
+                    // ⭐ 關鍵修正：不論是否為剛開始，都給予「剛好 1 個節拍」的緩衝時間再閃爍
+                    // 這樣第8張牌的翻牌音效與第1個黃框音效就不會在 0ms 撞在一起，且完美符合音樂節奏
+                    timer = setTimeout(tick, 60000 / beatStateRef.current.bpm);
+                }
+                return () => clearTimeout(timer); // 確保每次狀態變更時安全清除計時器
+            }, [gameStatus, speakWord, playTickSound]);
+
+            // 5. 局末等待蓋牌 (1 秒)
+            useEffect(() => {
+                let timer;
+                if (gameStatus === 'playing' && currentBeat === 9) {
+                    timer = setTimeout(() => {
+                        if (roundsPlayedRef.current < totalRounds - 1) {
+                            playTickSound(600, 'square', 0.08); 
+                            setTimeout(() => playTickSound(600, 'square', 0.08), 150); 
+                            setCurrentBeat(8); // 觸發背面顯示
+                        } else {
+                            playTickSound(400, 'sine', 0.5);
+                            setGameStatus('idle');
+                            setCurrentBeat(8);
+                            setIntroRevealedCount(0);
+                            if (introAudioRef.current) {
+                                introAudioRef.current.pause();
+                                introAudioRef.current.currentTime = 0;
+                            }
+                        }
+                    }, 1000); // 1秒後蓋牌
+                }
+                return () => clearTimeout(timer);
+            }, [gameStatus, currentBeat, totalRounds, playTickSound]);
+
+            // 6. 蓋牌翻轉動畫 (0.6 秒後洗牌進下一局)
+            useEffect(() => {
+                let timer;
+                if (gameStatus === 'playing' && currentBeat === 8) {
+                    timer = setTimeout(() => {
+                        roundsPlayedRef.current += 1;
+                        setCurrentRoundDisplay(roundsPlayedRef.current + 1);
+                        setBpm(prev => prev + 5 > 160 ? 160 : prev + 5);
+                        if (reshuffleOnLoop) shuffleCards(false);
+                        setIntroRevealedCount(0);
+                        setGameStatus('intro');
+                        setCurrentBeat(-1); 
+
+                        if (introAudioRef.current && introMusicSrc) {
+                            setIsWaitingForMusic(true);
+                            introAudioRef.current.currentTime = 0;
+                            introAudioRef.current.play().catch(e => {
+                                console.log("Intro music play failed", e);
+                                setIsWaitingForMusic(false);
+                            });
+                        } else {
+                            setIsWaitingForMusic(false);
+                        }
+                    }, 600);
+                }
+                return () => clearTimeout(timer);
+            }, [gameStatus, currentBeat, reshuffleOnLoop, shuffleCards, introMusicSrc]);
 
             const handleStart = () => {
+                // 解鎖 AudioContext
                 if (!audioContextRef.current) {
                     audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
                 }
@@ -360,19 +403,40 @@
                     audioContextRef.current.resume();
                 }
 
-                if (gameStatus === 'idle' || currentBeat >= 8) {
-                    roundsPlayedRef.current = 0; 
-                    setCurrentRoundDisplay(1);
-                    shuffleCards();
-                    setIntroRevealedCount(0);
-                    setGameStatus('intro');
-                } else {
-                    if (gameStatus === 'playing') {
-                        setGameStatus('idle');
-                        window.speechSynthesis.cancel();
-                    } else {
+                // 解鎖 SpeechSynthesis (確保 Safari/iOS 上練習模式能正常發音)
+                if (window.speechSynthesis) {
+                    const dummy = new SpeechSynthesisUtterance('');
+                    dummy.volume = 0;
+                    window.speechSynthesis.speak(dummy);
+                    window.speechSynthesis.cancel();
+                }
+
+                if (gameStatus === 'idle') {
+                    if ((currentBeat !== -1 && currentBeat !== 8) || (currentBeat === -1 && introRevealedCount >= 8)) {
                         setGameStatus('playing');
+                    } else {
+                        roundsPlayedRef.current = 0; 
+                        setCurrentRoundDisplay(1);
+                        shuffleCards(true); 
+                        setCurrentBeat(-1);
+                        setIntroRevealedCount(0);
+                        setGameStatus('intro'); 
+
+                        if (introAudioRef.current && introMusicSrc) {
+                            setIsWaitingForMusic(true);
+                            introAudioRef.current.currentTime = 0;
+                            introAudioRef.current.play().catch(e => {
+                                console.log("Intro music play failed", e);
+                                setIsWaitingForMusic(false);
+                            });
+                        } else {
+                            setIsWaitingForMusic(false);
+                        }
                     }
+                } else {
+                    setGameStatus('idle');
+                    window.speechSynthesis.cancel();
+                    if (introAudioRef.current) introAudioRef.current.pause();
                 }
             };
 
@@ -382,8 +446,13 @@
                 roundsPlayedRef.current = 0;
                 setCurrentRoundDisplay(1); 
                 setIntroRevealedCount(0);
+                setIsWaitingForMusic(false); 
                 window.speechSynthesis.cancel();
-                shuffleCards();
+                if (introAudioRef.current) {
+                    introAudioRef.current.pause();
+                    introAudioRef.current.currentTime = 0;
+                }
+                shuffleCards(true); 
             };
 
             const saveCustomList = () => {
@@ -404,7 +473,6 @@
                 if (window.confirm("確定要刪除已儲存的自定義生字嗎？此動作無法復原。")) {
                     localStorage.removeItem(STORAGE_KEY);
                     setTempInput("");
-                    
                     if (selectedLesson === "custom") {
                         setSelectedLesson(1);
                         setVocabList(LESSONS[0].words.split(''));
@@ -421,114 +489,148 @@
                      setTempInput(""); 
                      const saved = localStorage.getItem(STORAGE_KEY);
                      if (saved) {
-                         try {
-                             setTempInput(JSON.parse(saved).join("、"));
-                         } catch (e) {}
+                         try { setTempInput(JSON.parse(saved).join("、")); } catch (e) {}
                      }
                 }
-                
                 setErrorMsg("");
                 setShowSettings(true);
             };
 
+            const isInitial = gameStatus === 'idle' && currentBeat === -1 && introRevealedCount === 0;
+            const isPlaying = gameStatus === 'playing' || gameStatus === 'intro';
+            const isGameOver = gameStatus === 'idle' && currentBeat === 8;
+            const isPaused = gameStatus === 'idle' && !isInitial && !isGameOver;
+
             return (
-                <div className="min-h-screen bg-slate-100 flex flex-col items-center justify-center p-4 font-sans text-slate-800">
+                <div className="min-h-screen bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-50 via-slate-100 to-purple-50 flex flex-col items-center justify-center p-4 md:p-8 font-sans text-slate-800 overflow-x-hidden relative">
                     
-                    {/* 標題與控制列 */}
-                    <div className="w-full max-w-4xl mb-6 flex flex-col items-start gap-4 bg-white p-4 rounded-xl shadow-sm">
-                        
-                        {/* 標題區塊 */}
+                    <audio 
+                        ref={introAudioRef} 
+                        src={introMusicSrc} 
+                        onEnded={() => {
+                            if (gameStatus === 'intro') setIsWaitingForMusic(false);
+                        }}
+                        onError={(e) => {
+                            console.log("Audio load error", e);
+                            setIsWaitingForMusic(false);
+                        }}
+                    />
+
+                    {/* 頂部標題與控制面板 */}
+                    <div className="w-full max-w-5xl mb-6 flex flex-col items-start gap-4 bg-white/70 backdrop-blur-xl p-5 md:p-6 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.06)] border border-white z-30 relative">
                         <div className="w-full flex flex-col md:flex-row md:items-center justify-between gap-4">
-                            <div>
-                                <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-                                    <span className="text-indigo-600">🎶</span> Say the Word on Beat
-                                </h1>
-                                <p className="text-indigo-500 text-sm font-bold ml-9 mb-2">學華語向前走第二冊</p>
-                                <div className="flex items-center gap-2 text-sm text-slate-500 mt-1 flex-wrap">
-                                    <span className={`px-2 py-0.5 rounded-full text-xs flex items-center gap-1 ${difficulty === 'easy' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
-                                        {difficulty === 'easy' ? <Sparkles size={10} /> : <BrainCircuit size={10} />}
+                            <div className="flex flex-col gap-2">
+                                <div>
+                                    <h1 className="text-3xl md:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600 flex items-center gap-3 drop-shadow-sm pb-1">
+                                        <div className="flex items-center justify-center w-12 h-12 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-2xl shadow-inner border border-white transform -rotate-6">
+                                            <span className="text-2xl drop-shadow-md">🎶</span>
+                                        </div>
+                                        Say the Word on Beat
+                                    </h1>
+                                    <div className="flex items-center gap-2 ml-[3.5rem] md:ml-[4.25rem]">
+                                        <span className="bg-indigo-50/80 text-indigo-600 text-xs md:text-sm font-bold px-3 py-1 rounded-full border border-indigo-100 shadow-sm tracking-wide">
+                                            📚 學華語向前走 第二冊
+                                        </span>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2 text-sm text-slate-500 mt-2 flex-wrap">
+                                    <span className={`px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 shadow-sm border ${difficulty === 'easy' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-orange-50 text-orange-700 border-orange-200'}`}>
+                                        {difficulty === 'easy' ? <Sparkles size={12} /> : <BrainCircuit size={12} />}
                                         {difficulty === 'easy' ? '簡單模式' : '進階模式'}
                                     </span>
-                                    
-                                    <span className={`px-2 py-0.5 rounded-full text-xs flex items-center gap-1 ${playMode === 'practice' ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700'}`}>
-                                        {playMode === 'practice' ? <Volume size={10} /> : <Mic size={10} />}
-                                        {playMode === 'practice' ? '練習模式 (朗讀)' : '挑戰模式 (跟讀)'}
+                                    <span className={`px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 shadow-sm border ${playMode === 'practice' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
+                                        {playMode === 'practice' ? <Volume size={12} /> : <Mic size={12} />}
+                                        {playMode === 'practice' ? '練習模式 (自動發音跟讀)' : '挑戰模式 (無發音)'}
                                     </span>
-
-                                    {repeatCount > 0 ? (
-                                        <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
-                                            <Repeat size={10} />
-                                            第 {currentRoundDisplay} / {repeatCount + 1} 輪
+                                    {totalRounds > 1 ? (
+                                        <span className="text-xs bg-indigo-50 border border-indigo-200 text-indigo-700 px-3 py-1 rounded-full font-bold flex items-center gap-1.5 shadow-sm">
+                                            <Repeat size={12} />
+                                            闖關模式：共 {totalRounds} 關
                                         </span>
                                     ) : (
-                                        <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">
-                                            單次練習
+                                        <span className="text-xs bg-slate-100 text-slate-500 px-3 py-1 rounded-full font-bold shadow-sm border border-slate-200">
+                                            單局練習
                                         </span>
                                     )}
                                 </div>
                             </div>
 
-                            {/* 控制按鈕區 */}
                             <div className="flex items-center gap-3 flex-wrap justify-end">
-                                {/* BPM Control */}
-                                <div className="flex items-center gap-2 bg-slate-100 px-3 py-1.5 rounded-lg">
-                                    <span className="text-xs font-bold text-slate-500">BPM</span>
+                                <div className="flex items-center gap-2 bg-white/80 border border-slate-200 shadow-sm px-4 py-2 rounded-xl">
+                                    <span className="text-xs font-black text-slate-400 uppercase tracking-wider">BPM</span>
                                     <input 
-                                        type="range" 
-                                        min="40" 
-                                        max="180" 
-                                        step="5"
-                                        value={bpm} 
+                                        type="range" min="40" max="180" step="5" value={bpm} 
                                         onChange={(e) => setBpm(parseInt(e.target.value))}
-                                        className="w-20 accent-indigo-600"
+                                        className="w-24 accent-indigo-500 cursor-pointer"
                                     />
-                                    <span className="text-sm font-mono w-8 text-center">{bpm}</span>
+                                    <span className="text-sm font-black w-8 text-center text-indigo-600">{bpm}</span>
                                 </div>
-
                                 <button 
                                     onClick={() => setSoundEnabled(!soundEnabled)}
-                                    className={`p-2 rounded-full ${soundEnabled ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-200 text-slate-400'}`}
+                                    className={`p-2.5 rounded-xl shadow-sm border transition-all hover:scale-105 active:scale-95 ${soundEnabled ? 'bg-indigo-50 border-indigo-200 text-indigo-600' : 'bg-slate-100 border-slate-200 text-slate-400'}`}
                                 >
                                     {soundEnabled ? <Volume2 size={20} /> : <VolumeX size={20} />}
                                 </button>
-
                                 <button 
                                     onClick={openSettings}
-                                    className="flex items-center gap-1 px-4 py-2 bg-slate-200 hover:bg-slate-300 rounded-lg font-medium transition-colors"
+                                    className="flex items-center gap-1.5 px-4 py-2.5 bg-white border border-slate-200 shadow-sm hover:bg-slate-50 hover:border-slate-300 rounded-xl font-bold text-slate-700 transition-all hover:scale-105 active:scale-95"
                                 >
                                     <Settings size={18} /> 設定
                                 </button>
                             </div>
                         </div>
 
-                        {/* 課程選擇區 */}
-                        <div className="w-full pt-2 border-t border-slate-100 flex items-center gap-2">
-                             <BookOpen size={20} className="text-indigo-500" />
+                        <div className="w-full pt-4 border-t border-slate-200/60 flex items-center gap-3">
+                             <div className="bg-indigo-100 p-2 rounded-lg text-indigo-600">
+                                 <BookOpen size={20} />
+                             </div>
                              <select 
                                 value={selectedLesson}
                                 onChange={handleLessonChange}
-                                className="flex-1 p-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-700 text-sm font-medium focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none cursor-pointer"
+                                className="flex-1 p-3 bg-white border border-slate-200 shadow-sm rounded-xl text-slate-700 text-sm font-bold focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none cursor-pointer transition-all appearance-none"
+                                style={{backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M5 7l5 5 5-5'/%3e%3c/svg%3e")`, backgroundPosition: `right 0.75rem center`, backgroundRepeat: `no-repeat`, backgroundSize: `1.5em 1.5em`, paddingRight: `2.5rem`}}
                              >
                                 {LESSONS.map(lesson => (
-                                    <option key={lesson.id} value={lesson.id}>
-                                        {lesson.name}
-                                    </option>
+                                    <option key={lesson.id} value={lesson.id}>{lesson.name}</option>
                                 ))}
                                 <option disabled>──────────</option>
                                 <option value="review">🔄 綜合複習 (全 12 課隨機)</option>
                                 <option value="custom">✏️ 自定義生字 (我的最愛)</option>
                              </select>
                         </div>
-
                     </div>
 
                     {/* 主要遊戲區 */}
-                    <div className="w-full max-w-4xl relative">
+                    <div className="w-full max-w-5xl relative mt-4 md:mt-6 mb-12 px-4 md:px-12">
                         
-                        {/* 卡片網格 */}
-                        <div className="grid grid-cols-4 gap-4 w-full aspect-[2/1] md:aspect-[8/3]">
+                        <div className="flex justify-center mb-6 z-30 relative">
+                            <div className="bg-white/90 backdrop-blur-md border border-indigo-100 shadow-[0_8px_20px_rgba(79,70,229,0.15)] px-6 py-2 rounded-full flex items-center gap-4 transform transition-all hover:scale-105">
+                                <span className="text-indigo-800 font-black tracking-wider text-sm md:text-base flex items-center gap-2">
+                                    <Repeat size={18} className="text-indigo-500"/>
+                                    題號
+                                </span>
+                                <div className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white px-5 py-1 rounded-full font-black text-xl md:text-2xl shadow-inner tracking-widest flex items-baseline gap-1">
+                                    {currentRoundDisplay} <span className="text-indigo-200 text-lg md:text-xl font-bold">/</span> {totalRounds}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className={`absolute -top-6 left-0 md:-top-10 md:left-4 text-blue-500 z-20 transition-all ${gameStatus === 'playing' || gameStatus === 'intro' ? 'shake-active text-blue-500 scale-110' : 'drop-shadow-md opacity-80'}`}>
+                            <Megaphone size={56} className="w-12 h-12 md:w-16 md:h-16" />
+                        </div>
+                        <div className={`absolute -top-6 right-0 md:-top-10 md:right-4 text-yellow-400 z-20 flex transition-all ${gameStatus === 'playing' || gameStatus === 'intro' ? 'shake-active text-yellow-400 scale-110' : 'drop-shadow-md opacity-80'}`}>
+                            <Zap size={56} className="translate-x-3 w-12 h-12 md:w-16 md:h-16" />
+                            <Zap size={56} className="-translate-x-3 opacity-60 w-12 h-12 md:w-16 md:h-16" />
+                        </div>
+                        <div className={`absolute -bottom-6 left-0 md:-bottom-10 md:left-4 text-rose-500 z-20 transition-all ${gameStatus === 'playing' || gameStatus === 'intro' ? 'shake-active text-rose-500 scale-110' : 'drop-shadow-md opacity-80'}`}>
+                            <Exclamation size={56} className="w-12 h-12 md:w-16 md:h-16" />
+                        </div>
+                        <div className={`absolute -bottom-6 right-0 md:-bottom-10 md:right-4 text-amber-500 z-20 transition-all ${gameStatus === 'playing' || gameStatus === 'intro' ? 'shake-active text-amber-500 scale-110' : 'drop-shadow-md opacity-80'}`}>
+                            <Lightbulb size={56} className="w-12 h-12 md:w-16 md:h-16" />
+                        </div>
+
+                        <div className="grid grid-cols-4 gap-4 md:gap-6 w-full aspect-[2/1.1] md:aspect-[8/3.2] relative z-10">
                             {activeCards.map((word, index) => {
-                                // Visibility Logic
                                 let isRevealed = false;
                                 let isHighlighted = false;
 
@@ -537,8 +639,8 @@
                                 } else if (gameStatus === 'playing') {
                                     isRevealed = currentBeat !== 8;
                                     isHighlighted = index === currentBeat;
-                                } else {
-                                    isRevealed = false;
+                                } else if (gameStatus === 'idle') {
+                                    isRevealed = (currentBeat >= 0 && currentBeat !== 8) || (currentBeat === -1 && introRevealedCount >= 8);
                                 }
                                 
                                 return (
@@ -547,265 +649,221 @@
                                             className={`relative w-full h-full duration-500 preserve-3d transition-transform ${isRevealed ? 'rotate-y-0' : 'rotate-y-180'}`}
                                             style={{ transformStyle: 'preserve-3d', transform: isRevealed ? 'rotateY(0deg)' : 'rotateY(180deg)' }}
                                         >
-                                            {/* 正面 (內容) */}
-                                            <div className={`absolute w-full h-full backface-hidden rounded-xl shadow-lg flex items-center justify-center text-3xl md:text-4xl font-bold select-none border-4
+                                            <div className={`absolute w-full h-full backface-hidden rounded-3xl flex items-center justify-center text-4xl md:text-5xl lg:text-6xl font-black select-none
                                                 ${isHighlighted 
-                                                    ? 'bg-yellow-100 border-yellow-400 text-indigo-700 scale-105 z-10 ring-4 ring-yellow-200' 
-                                                    : 'bg-white border-slate-200 text-slate-700 scale-100'}
-                                                transition-all duration-150
+                                                    ? 'bg-gradient-to-b from-yellow-50 to-yellow-100 border-x-4 border-t-4 border-b-[8px] border-yellow-400 text-indigo-800 scale-[1.08] z-20 shadow-[0_0_35px_rgba(250,204,21,0.6)] ring-4 ring-yellow-400/30' 
+                                                    : 'bg-white border-x-2 border-t-2 border-b-[8px] border-slate-200 text-slate-700 scale-100 shadow-[0_8px_15px_rgba(0,0,0,0.05)]'}
+                                                transition-all duration-200
                                             `}>
                                                 {word}
                                             </div>
 
-                                            {/* 背面 (蓋牌) */}
                                             <div 
-                                                className="absolute w-full h-full backface-hidden rounded-xl shadow-md bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center border-4 border-white"
+                                                className="absolute w-full h-full backface-hidden rounded-3xl shadow-[0_10px_20px_rgba(79,70,229,0.3)] bg-gradient-to-br from-indigo-500 via-purple-600 to-violet-700 flex items-center justify-center border-x-2 border-t-2 border-b-[8px] border-indigo-800/80 overflow-hidden"
                                                 style={{ transform: 'rotateY(180deg)' }}
                                             >
-                                                <span className="text-white/30 text-4xl font-bold">{index + 1}</span>
+                                                <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/10 to-transparent"></div>
+                                                <span className="text-white/30 text-5xl md:text-6xl font-black drop-shadow-md select-none">{index + 1}</span>
                                             </div>
                                         </div>
                                     </div>
                                 );
                             })}
                         </div>
-
-                        {/* 底部播放控制 */}
-                        <div className="mt-8 flex justify-center gap-6">
-                            {gameStatus === 'idle' && (
-                                <button 
-                                    onClick={handleStart}
-                                    className="group flex flex-col items-center gap-2"
-                                >
-                                    <div className="w-16 h-16 bg-indigo-600 rounded-full flex items-center justify-center shadow-lg shadow-indigo-300 group-hover:scale-110 transition-transform">
-                                        <Play fill="white" className="ml-1 text-white" size={32} />
-                                    </div>
-                                    <span className="font-bold text-indigo-600">開始</span>
-                                </button>
-                            )}
-
-                            {(gameStatus === 'playing' || gameStatus === 'intro') && (
-                                <button 
-                                    onClick={() => setGameStatus('idle')}
-                                    className="group flex flex-col items-center gap-2"
-                                >
-                                    <div className="w-16 h-16 bg-red-500 rounded-full flex items-center justify-center shadow-lg shadow-red-300 group-hover:scale-110 transition-transform">
-                                        <div className="w-8 h-8 bg-white rounded-md"></div>
-                                    </div>
-                                    <span className="font-bold text-red-500">暫停</span>
-                                </button>
-                            )}
-
-                            {/* 只要不是完全初始狀態 (未玩過)，就顯示重置按鈕 */}
-                            {(roundsPlayedRef.current > 0 || currentBeat !== -1 || gameStatus !== 'idle') && (
-                                <div className="flex gap-6">
-                                    {/* 暫停時顯示繼續按鈕 */}
-                                    {gameStatus === 'idle' && currentBeat !== -1 && (
-                                        <button 
-                                            onClick={() => setGameStatus('playing')}
-                                            className="group flex flex-col items-center gap-2"
-                                        >
-                                            <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center shadow-lg shadow-green-300 group-hover:scale-110 transition-transform">
-                                                <Play fill="white" className="ml-1 text-white" size={32} />
-                                            </div>
-                                            <span className="font-bold text-green-600">繼續</span>
-                                        </button>
-                                    )}
-
-                                    <button 
-                                        onClick={handleReset}
-                                        className="group flex flex-col items-center gap-2"
-                                    >
-                                        <div className="w-16 h-16 bg-amber-500 rounded-full flex items-center justify-center shadow-lg shadow-amber-300 group-hover:scale-110 transition-transform">
-                                            <RefreshCw className="text-white" size={32} />
-                                        </div>
-                                        <span className="font-bold text-amber-600">重置</span>
-                                    </button>
-                                </div>
-                            )}
-                        </div>
                     </div>
 
-                    <div className="mt-8 text-slate-400 text-sm font-medium">
-                        Design by Sophia
+                    {/* 底部按鈕 */}
+                    <div className="mt-6 md:mt-10 flex justify-center gap-8 z-30 relative">
+                        {isInitial && (
+                            <button onClick={handleStart} className="group flex flex-col items-center gap-3">
+                                <div className="push-btn w-20 h-20 bg-gradient-to-b from-indigo-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-[0_10px_20px_rgba(79,70,229,0.3)] border-b-[6px] border-indigo-800 hover:brightness-110">
+                                    <Play fill="white" className="ml-1.5 text-white" size={36} />
+                                </div>
+                                <span className="font-bold text-indigo-700 tracking-wide text-lg">開始遊戲</span>
+                            </button>
+                        )}
+
+                        {isPlaying && (
+                            <button onClick={() => { setGameStatus('idle'); window.speechSynthesis.cancel(); if (introAudioRef.current) introAudioRef.current.pause(); }} className="group flex flex-col items-center gap-3">
+                                <div className="push-btn w-20 h-20 bg-gradient-to-b from-red-500 to-rose-600 rounded-2xl flex items-center justify-center shadow-[0_10px_20px_rgba(225,29,72,0.3)] border-b-[6px] border-red-800 hover:brightness-110">
+                                    <Pause fill="white" className="text-white" size={36} />
+                                </div>
+                                <span className="font-bold text-red-600 tracking-wide text-lg">暫停</span>
+                            </button>
+                        )}
+
+                        {isPaused && (
+                            <div className="flex gap-8">
+                                <button onClick={() => setGameStatus('playing')} className="group flex flex-col items-center gap-3">
+                                    <div className="push-btn w-20 h-20 bg-gradient-to-b from-emerald-500 to-green-500 rounded-2xl flex items-center justify-center shadow-[0_10px_20px_rgba(16,185,129,0.3)] border-b-[6px] border-emerald-800 hover:brightness-110">
+                                        <Play fill="white" className="ml-1.5 text-white" size={36} />
+                                    </div>
+                                    <span className="font-bold text-emerald-700 tracking-wide text-lg">繼續</span>
+                                </button>
+                                <button onClick={handleReset} className="group flex flex-col items-center gap-3">
+                                    <div className="push-btn w-20 h-20 bg-gradient-to-b from-amber-400 to-orange-500 rounded-2xl flex items-center justify-center shadow-[0_10px_20px_rgba(245,158,11,0.3)] border-b-[6px] border-amber-700 hover:brightness-110">
+                                        <Repeat className="text-white" size={32} strokeWidth="3" />
+                                    </div>
+                                    <span className="font-bold text-amber-700 tracking-wide text-lg">重置</span>
+                                </button>
+                            </div>
+                        )}
+
+                        {isGameOver && (
+                            <div className="flex gap-8 animate-in fade-in zoom-in duration-300">
+                                <button onClick={handleReset} className="group flex flex-col items-center gap-3">
+                                    <div className="push-btn w-20 h-20 bg-gradient-to-b from-slate-500 to-slate-600 rounded-2xl flex items-center justify-center shadow-[0_10px_20px_rgba(100,116,139,0.3)] border-b-[6px] border-slate-700 hover:brightness-110">
+                                        <Check className="text-white" size={40} strokeWidth="4" />
+                                    </div>
+                                    <span className="font-bold text-slate-600 tracking-wide text-lg">結束</span>
+                                </button>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="mt-12 text-slate-400/80 text-sm font-bold tracking-widest z-30 relative uppercase">
+                        Created by Sophia Wong
                     </div>
 
                     {/* 設定 Modal */}
                     {showSettings && (
-                        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-                            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
-                                <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-indigo-50">
-                                    <h2 className="text-lg font-bold text-indigo-900 flex items-center gap-2">
-                                        <Settings size={20} /> 遊戲設定
+                        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                            <div className="bg-white rounded-[2rem] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)] border border-white/50 w-full max-w-xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
+                                <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-gradient-to-r from-indigo-50 to-white">
+                                    <h2 className="text-xl font-black text-indigo-900 flex items-center gap-2">
+                                        <Settings size={22} className="text-indigo-600" /> 遊戲設定
                                     </h2>
-                                    <button onClick={() => setShowSettings(false)} className="text-slate-400 hover:text-slate-600">
+                                    <button onClick={() => setShowSettings(false)} className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-full transition-colors">
                                         <X size={24} />
                                     </button>
                                 </div>
                                 
-                                <div className="p-6 overflow-y-auto">
-
-                                    {/* 0. 模式選擇 */}
-                                    <div className="mb-6 p-4 bg-slate-50 rounded-xl border border-slate-100">
-                                        <h3 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
-                                            <Mic size={16} /> 模式選擇
+                                <div className="p-6 overflow-y-auto space-y-6">
+                                    <div className="p-5 bg-slate-50 rounded-2xl border border-slate-100/80 shadow-sm">
+                                        <h3 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
+                                            <div className="bg-white p-1.5 rounded shadow-sm text-indigo-500"><Music size={16} /></div> 
+                                            開場音樂設定
                                         </h3>
                                         <div className="flex flex-col gap-3">
-                                            {/* 挑戰模式 */}
-                                            <label className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all ${playMode === 'challenge' ? 'bg-red-50 border-red-400 shadow-sm ring-1 ring-red-100' : 'border-transparent hover:bg-white'}`}>
-                                                <input 
-                                                    type="radio" 
-                                                    name="playMode"
-                                                    value="challenge"
-                                                    checked={playMode === 'challenge'}
-                                                    onChange={() => setPlayMode('challenge')}
-                                                    className="mt-1 w-4 h-4 text-red-600 border-gray-300 focus:ring-red-500"
-                                                />
-                                                <div>
-                                                    <span className="block font-bold text-slate-800 text-sm">挑戰模式 (Challenge)</span>
-                                                    <span className="text-xs text-slate-500">
-                                                        亮牌時<strong className="text-red-600">不讀字</strong>，只有節拍聲。請學生大聲唸出卡片內容。
-                                                    </span>
-                                                </div>
-                                            </label>
-
-                                            {/* 練習模式 */}
-                                            <label className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all ${playMode === 'practice' ? 'bg-blue-50 border-blue-400 shadow-sm ring-1 ring-blue-100' : 'border-transparent hover:bg-white'}`}>
-                                                <input 
-                                                    type="radio" 
-                                                    name="playMode"
-                                                    value="practice"
-                                                    checked={playMode === 'practice'}
-                                                    onChange={() => setPlayMode('practice')}
-                                                    className="mt-1 w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
-                                                />
-                                                <div>
-                                                    <span className="block font-bold text-slate-800 text-sm">練習模式 (Practice)</span>
-                                                    <span className="text-xs text-slate-500">
-                                                        亮牌時<strong className="text-blue-600">自動讀字</strong> (TTS)。適合初學或複習發音。
-                                                    </span>
-                                                </div>
-                                            </label>
-                                        </div>
-                                    </div>
-                                    
-                                    {/* 1. 難度設定 */}
-                                    <div className="mb-6 p-4 bg-slate-50 rounded-xl border border-slate-100">
-                                        <h3 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
-                                            <BrainCircuit size={16} /> 卡片難度
-                                        </h3>
-                                        <div className="flex flex-col gap-3">
-                                            {/* 簡單模式選項 */}
-                                            <label className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all ${difficulty === 'easy' ? 'bg-white border-green-400 shadow-sm ring-1 ring-green-100' : 'border-transparent hover:bg-white'}`}>
-                                                <input 
-                                                    type="radio" 
-                                                    name="difficulty"
-                                                    value="easy"
-                                                    checked={difficulty === 'easy'}
-                                                    onChange={() => setDifficulty('easy')}
-                                                    className="mt-1 w-4 h-4 text-green-600 border-gray-300 focus:ring-green-500"
-                                                />
-                                                <div>
-                                                    <span className="block font-bold text-slate-800 text-sm">簡單模式 (Easy)</span>
-                                                    <span className="text-xs text-slate-500">
-                                                        每次選出 <strong className="text-green-600">4 個生字</strong>，每個字出現 <strong className="text-green-600">2 次</strong>。
-                                                        <br/>適合初學者熟悉單字。<span className="text-red-500 font-bold ml-1">(每輪自動加速 +5 BPM，上限 160)</span>
-                                                    </span>
-                                                </div>
-                                            </label>
-
-                                            {/* 進階模式選項 */}
-                                            <label className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all ${difficulty === 'advanced' ? 'bg-white border-orange-400 shadow-sm ring-1 ring-orange-100' : 'border-transparent hover:bg-white'}`}>
-                                                <input 
-                                                    type="radio" 
-                                                    name="difficulty"
-                                                    value="advanced"
-                                                    checked={difficulty === 'advanced'}
-                                                    onChange={() => setDifficulty('advanced')}
-                                                    className="mt-1 w-4 h-4 text-orange-600 border-gray-300 focus:ring-orange-500"
-                                                />
-                                                <div>
-                                                    <span className="block font-bold text-slate-800 text-sm">進階模式 (Advanced)</span>
-                                                    <span className="text-xs text-slate-500">
-                                                        每次選出 <strong className="text-orange-600">8 個不重複</strong>的生字。
-                                                        <br/>適合挑戰反應速度與大量單字。<span className="text-red-500 font-bold ml-1">(每輪自動加速 +5 BPM，上限 160)</span>
-                                                    </span>
-                                                </div>
-                                            </label>
-                                        </div>
-                                    </div>
-
-                                    {/* 2. 循環設定 */}
-                                    <div className="mb-6 p-4 bg-slate-50 rounded-xl border border-slate-100">
-                                        <h3 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
-                                            <Repeat size={16} /> 自動循環設定
-                                        </h3>
-                                        <div className="space-y-4">
-                                            <div className="flex items-center justify-between">
-                                                <label className="text-sm text-slate-600">額外重複次數</label>
-                                                <div className="flex items-center gap-2">
-                                                    <input 
-                                                        type="number" 
-                                                        min="0" 
-                                                        max="20"
-                                                        value={repeatCount}
-                                                        onChange={(e) => setRepeatCount(Math.max(0, parseInt(e.target.value) || 0))}
-                                                        className="w-20 p-1 border border-slate-300 rounded text-center"
-                                                    />
-                                                    <span className="text-xs text-slate-400">次 (0 = 玩一次即停)</span>
-                                                </div>
+                                            <div className="text-sm text-slate-600 bg-white px-3 py-2 rounded-lg border border-slate-100">
+                                                目前音樂：<span className="font-bold text-indigo-600 truncate inline-block align-bottom max-w-[200px]">{introMusicName}</span>
                                             </div>
+                                            <label className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl cursor-pointer transition-colors border-2 border-dashed border-indigo-200 hover:border-indigo-400 hover:bg-indigo-50/50 group">
+                                                <input type="file" accept="audio/*" onChange={handleIntroMusicUpload} className="hidden" />
+                                                <Upload size={18} className="text-indigo-400 group-hover:text-indigo-600" />
+                                                <span className="text-sm font-bold text-indigo-600">上傳開場音樂 (單次覆蓋)</span>
+                                            </label>
+                                            <p className="text-xs text-slate-400 font-medium">支援 .mp3, .m4a, .wav 等格式。上傳僅供單次使用，若要永久更改，請修改程式碼中的 DEFAULT_MUSIC_URL。</p>
+                                        </div>
+                                    </div>
 
-                                            <div className="flex items-center gap-2">
-                                                <input 
-                                                    type="checkbox"
-                                                    id="reshuffle"
-                                                    checked={reshuffleOnLoop}
-                                                    onChange={(e) => setReshuffleOnLoop(e.target.checked)}
-                                                    className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500"
-                                                />
-                                                <label htmlFor="reshuffle" className="text-sm text-slate-600 cursor-pointer select-none">
-                                                    循環時更換新的生字 (重新洗牌)
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="p-5 bg-slate-50 rounded-2xl border border-slate-100/80 shadow-sm">
+                                            <h3 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
+                                                <div className="bg-white p-1.5 rounded shadow-sm text-blue-500"><Mic size={16} /></div> 
+                                                模式選擇
+                                            </h3>
+                                            <div className="flex flex-col gap-3">
+                                                <label className={`flex items-start gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${playMode === 'practice' ? 'bg-blue-50/50 border-blue-400' : 'border-transparent bg-white hover:border-slate-200'}`}>
+                                                    <input type="radio" name="playMode" value="practice" checked={playMode === 'practice'} onChange={() => setPlayMode('practice')} className="mt-1 w-4 h-4 text-blue-600 accent-blue-600" />
+                                                    <div>
+                                                        <span className="block font-bold text-slate-800 text-sm">練習模式 (自動發音)</span>
+                                                        <span className="text-xs text-slate-500 leading-relaxed block mt-1">電腦自動發音，帶領學生跟讀。</span>
+                                                    </div>
+                                                </label>
+                                                <label className={`flex items-start gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${playMode === 'challenge' ? 'bg-red-50/50 border-red-400' : 'border-transparent bg-white hover:border-slate-200'}`}>
+                                                    <input type="radio" name="playMode" value="challenge" checked={playMode === 'challenge'} onChange={() => setPlayMode('challenge')} className="mt-1 w-4 h-4 text-red-600 accent-red-600" />
+                                                    <div>
+                                                        <span className="block font-bold text-slate-800 text-sm">挑戰模式</span>
+                                                        <span className="text-xs text-slate-500 leading-relaxed block mt-1">不讀字，僅播放節拍。</span>
+                                                    </div>
+                                                </label>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="p-5 bg-slate-50 rounded-2xl border border-slate-100/80 shadow-sm">
+                                            <h3 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
+                                                <div className="bg-white p-1.5 rounded shadow-sm text-green-500"><BrainCircuit size={16} /></div> 
+                                                卡片難度
+                                            </h3>
+                                            <div className="flex flex-col gap-3">
+                                                <label className={`flex items-start gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${difficulty === 'easy' ? 'bg-green-50/50 border-green-400' : 'border-transparent bg-white hover:border-slate-200'}`}>
+                                                    <input type="radio" name="difficulty" value="easy" checked={difficulty === 'easy'} onChange={() => setDifficulty('easy')} className="mt-1 w-4 h-4 text-green-600 accent-green-600" />
+                                                    <div>
+                                                        <span className="block font-bold text-slate-800 text-sm">簡單 (4個字x2)</span>
+                                                    </div>
+                                                </label>
+                                                <label className={`flex items-start gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${difficulty === 'advanced' ? 'bg-orange-50/50 border-orange-400' : 'border-transparent bg-white hover:border-slate-200'}`}>
+                                                    <input type="radio" name="difficulty" value="advanced" checked={difficulty === 'advanced'} onChange={() => setDifficulty('advanced')} className="mt-1 w-4 h-4 text-orange-600 accent-orange-600" />
+                                                    <div>
+                                                        <span className="block font-bold text-slate-800 text-sm">進階 (8個不重複)</span>
+                                                    </div>
                                                 </label>
                                             </div>
                                         </div>
                                     </div>
 
-                                    {/* 3. 生字設定 */}
-                                    <label className="block text-sm font-medium text-slate-700 mb-2">
-                                        <Edit3 size={16} className="inline mr-1" /> 自定義生字庫
-                                    </label>
-                                    <textarea 
-                                        value={tempInput}
-                                        onChange={(e) => setTempInput(e.target.value)}
-                                        className="w-full h-32 p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-none text-base"
-                                        placeholder="例如：蘋果, 香蕉, 🚗, ✈️ (用逗號分隔)"
-                                    ></textarea>
-                                    <p className="text-xs text-slate-500 mt-2">
-                                        * 詞庫越多，啟用「循環時更換生字」就越好玩！
-                                    </p>
-                                    {errorMsg && (
-                                        <p className="text-sm text-red-500 mt-2 font-bold">{errorMsg}</p>
-                                    )}
+                                    <div className="p-5 bg-slate-50 rounded-2xl border border-slate-100/80 shadow-sm">
+                                        <h3 className="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                            <div className="bg-white p-1.5 rounded shadow-sm text-indigo-500"><Repeat size={16} /></div> 
+                                            遊戲局數設定
+                                        </h3>
+                                        <div className="space-y-4">
+                                            <div className="grid grid-cols-3 gap-3">
+                                                <button onClick={() => setTotalRounds(1)} className={`py-2 px-2 md:px-3 rounded-xl border-2 font-bold text-xs md:text-sm transition-all ${totalRounds === 1 ? 'bg-indigo-50 border-indigo-400 text-indigo-700 shadow-sm' : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'}`}>單局 (1次)</button>
+                                                <button onClick={() => setTotalRounds(5)} className={`py-2 px-2 md:px-3 rounded-xl border-2 font-bold text-xs md:text-sm transition-all ${totalRounds === 5 ? 'bg-indigo-50 border-indigo-400 text-indigo-700 shadow-sm' : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'}`}>闖關 (5次)</button>
+                                                <div className="flex items-center gap-1 md:gap-2 bg-white border-2 border-slate-200 rounded-xl px-2 focus-within:border-indigo-400 transition-colors">
+                                                    <span className="text-xs font-bold text-slate-400 whitespace-nowrap">自訂</span>
+                                                    <input 
+                                                        type="number" min="1" max="50" value={totalRounds}
+                                                        onChange={(e) => setTotalRounds(Math.max(1, parseInt(e.target.value) || 1))}
+                                                        className="w-full bg-transparent text-center font-bold text-indigo-600 outline-none text-sm md:text-base"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <label className="flex items-center gap-3 p-3 bg-white rounded-xl border border-slate-100 cursor-pointer hover:bg-slate-50 transition-colors">
+                                                <input 
+                                                    type="checkbox" id="reshuffle" checked={reshuffleOnLoop}
+                                                    onChange={(e) => setReshuffleOnLoop(e.target.checked)}
+                                                    className="w-5 h-5 text-indigo-600 rounded focus:ring-indigo-500 accent-indigo-600"
+                                                />
+                                                <span className="text-sm font-bold text-slate-700 select-none">每局更換新的生字 (重新洗牌)</span>
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-bold text-slate-800 mb-2 flex items-center gap-2">
+                                            <div className="bg-indigo-50 p-1.5 rounded text-indigo-600"><Edit3 size={16} /></div>
+                                            自定義生字庫
+                                        </label>
+                                        <textarea 
+                                            value={tempInput}
+                                            onChange={(e) => setTempInput(e.target.value)}
+                                            className="w-full h-28 p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl focus:ring-0 focus:border-indigo-500 resize-none text-base font-medium shadow-inner transition-colors"
+                                            placeholder="例如：蘋果, 香蕉, 🚗, ✈️ (用逗號分隔)"
+                                        ></textarea>
+                                        {errorMsg && <p className="text-sm text-rose-500 mt-2 font-bold flex items-center gap-1"><Exclamation size={14}/> {errorMsg}</p>}
+                                    </div>
                                 </div>
 
-                                <div className="p-4 border-t border-slate-100 flex justify-between items-center bg-slate-50">
+                                <div className="p-5 border-t border-slate-100 flex justify-between items-center bg-slate-50/80 backdrop-blur-sm">
                                     <button 
                                         onClick={clearCustomList}
-                                        className="text-red-500 hover:text-red-700 text-sm font-medium flex items-center gap-1 px-2 py-1 rounded hover:bg-red-50 transition-colors"
+                                        className="text-slate-400 hover:text-rose-600 text-sm font-bold flex items-center gap-1.5 px-3 py-2 rounded-lg hover:bg-rose-50 transition-colors"
                                     >
                                         <Trash2 size={16} /> 清除紀錄
                                     </button>
                                     <div className="flex gap-3">
                                         <button 
                                             onClick={() => setShowSettings(false)}
-                                            className="px-4 py-2 text-slate-600 hover:bg-slate-200 rounded-lg font-medium transition-colors"
+                                            className="px-5 py-2.5 text-slate-600 hover:bg-slate-200 bg-slate-100 rounded-xl font-bold transition-colors"
                                         >
-                                            取消
+                                            確定
                                         </button>
                                         <button 
                                             onClick={saveCustomList}
-                                            className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold shadow-md transition-transform active:scale-95"
+                                            className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold shadow-[0_4px_10px_rgba(79,70,229,0.3)] transition-transform active:scale-95"
                                         >
                                             儲存設定
                                         </button>

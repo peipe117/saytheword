@@ -569,7 +569,8 @@
                                         <div className="flex-shrink-0 flex items-center justify-center w-12 h-12 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-2xl shadow-inner border border-white transform -rotate-6">
                                             <span className="text-2xl drop-shadow-md">🎶</span>
                                         </div>
-                                        <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600">
+                                        {/* 修正：加上 inline-block 與 pb-1 (或 py-1) 防止字母 y 的下半部被切掉 */}
+                                        <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600 inline-block pb-1">
                                             Say the Word on Beat
                                         </span>
                                     </h1>
